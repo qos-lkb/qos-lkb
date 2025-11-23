@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理教學：光的折射 (車輛模型)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 MathJax 用於顯示數學公式 -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        /* 自定義 Slider 樣式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #2563eb;
+            margin-top: -7px;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+        /* 禁止選取文字，讓操作更順暢 */
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans h-screen flex flex-col overflow-hidden no-select">
+
+    <!-- 頂部標題列 -->
+    <header class="bg-slate-900 text-white p-4 shadow-lg flex justify-between items-center z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-500 p-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide">光的折射原理</h1>
+                <p class="text-xs text-slate-400">車輛模型比喻：從快介質進入慢介質</p>
+            </div>
+        </div>
+        <div class="text-right hidden sm:block pr-4">
+            <!-- 使用 MathJax 顯示公式 -->
+            <div class="text-sm text-yellow-400">
+                \( n_1 \sin \theta_1 = n_2 \sin \theta_2 \)
+            </div>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <div class="flex flex-1 h-full overflow-hidden">
+        
+        <!-- 左側控制面板 -->
+        <aside class="w-80 bg-white shadow-xl flex flex-col z-10 border-r border-gray-200 overflow-y-auto">
+            <div class="p-6 space-y-6">
+                
+                <!-- 1. 地面材質選擇 -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-bold text-slate-700 uppercase tracking-wider">
+                        1. 選擇介質 2 (下方地面)
+                    </label>
+                    <div class="relative">
+                        <select id="surfaceSelect" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none appearance-none font-medium">
+                            <option value="0.9">混凝土路 (速度 90%) - 輕微折射</option>
+                            <option value="0.6" selected>泥地 (速度 60%) - 明顯折射</option>
+                            <option value="0.4">鬆軟沙地 (速度 40%) - 強烈折射</option>
+                            <option value="0.25">黏稠沼澤 (速度 25%) - 極端折射</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 pl-1">
+                        * 上方預設為 <span class="font-bold text-slate-700">柏油路 (速度 100%)</span>
+                    </p>
+                </div>
+
+                <!-- 2. 入射角 Slidebar -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-sm font-bold text-slate-700 uppercase tracking-wider">
+                            2. 設定入射角 (\(\theta_1\))
+                        </label>
+                        <span id="angleValue" class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">30°</span>
+                    </div>
+                    <div class="relative h-6 flex items-center">
+                        <input type="range" id="angleInput" min="0" max="75" value="30" step="1" class="w-full z-20 relative">
+                        <!-- 刻度 -->
+                        <div class="absolute w-full flex justify-between text-[10px] text-gray-400 top-6 px-1">
+                            <span>0°</span>
+                            <span>15°</span>
+                            <span>30°</span>
+                            <span>45°</span>
+                            <span>60°</span>
+                            <span>75°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 顯示設定 -->
+                <div class="space-y-3 pt-2">
+                    <label class="block text-sm font-bold text-slate-700 uppercase tracking-wider">
+                        顯示設定
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                        <div class="relative">
+                            <input id="showPathCheck" type="checkbox" checked class="sr-only peer">
+                            <div class="w-10 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition">顯示路徑、法線與角度</span>
+                    </label>
+                </div>
+
+                <!-- 數據面板 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase border-b border-slate-200 pb-2">預測數據</h3>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-600">介質速率 (\(v_2\)):</span>
+                        <span id="speedDisplay" class="font-mono font-bold text-slate-800">60%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-600">折射角 (\(\theta_2\)):</span>
+                        <span id="refractionAngleDisplay" class="font-mono font-bold text-red-600">--°</span>
+                    </div>
+                    
+                    <!-- 新增：折射率計算 -->
+                    <div class="mt-4 pt-2 border-t border-slate-200">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">折射率計算 (斯涅耳定律)</h3>
+                        <div id="calculationDisplay" class="text-xs font-mono text-slate-700 bg-white p-2 rounded border border-slate-100 leading-relaxed overflow-x-auto">
+                            <!-- JS將在此填入內容 -->
+                            計算中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 開始按鈕 -->
+            <div class="mt-auto p-6 border-t border-gray-100 bg-gray-50 space-y-3">
+                <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                    開始模擬
+                </button>
+                <button id="resetBtn" class="w-full bg-white border border-gray-300 text-gray-700 font-bold py-2 px-4 rounded-xl hover:bg-gray-50 transition-colors">
+                    重置
+                </button>
+            </div>
+        </aside>
+
+        <!-- 右側 Canvas 區域 -->
+        <main class="flex-1 relative bg-gray-200">
+            <canvas id="simCanvas" class="block w-full h-full cursor-crosshair"></canvas>
+            
+            <!-- 實時狀態浮層 (HUD) -->
+            <div id="hud" class="absolute top-6 left-6 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-gray-200 w-64 hidden">
+                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">實時狀態</h4>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">當前位置:</span>
+                        <span id="hudLocation" class="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-800">柏油路</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">當前速率:</span>
+                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="hudSpeedBar" class="h-full bg-blue-500 transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                        <span class="text-sm text-gray-600">左輪狀態:</span>
+                        <span id="hudLeftWheel" class="w-3 h-3 rounded-full bg-green-500"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">右輪狀態:</span>
+                        <span id="hudRightWheel" class="w-3 h-3 rounded-full bg-green-500"></span>
+                    </div>
+                </div>
+                <div id="turnAlert" class="mt-3 text-xs bg-yellow-50 text-yellow-700 p-2 rounded border border-yellow-100 hidden">
+                    ⚡ 右輪進入慢速區，車身向右旋轉！
+                </div>
+            </div>
+
+            <!-- 圖例 -->
+            <div class="absolute bottom-6 right-6 flex flex-col gap-2 pointer-events-none">
+                <div class="bg-white/80 backdrop-blur px-3 py-2 rounded-lg text-xs text-gray-600 border border-gray-200 shadow-sm">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-3 h-3 bg-gray-800 rounded"></div> <span>柏油路 (快)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div id="legendSurfaceColor" class="w-3 h-3 bg-amber-700 rounded"></div> <span>選定材質 (慢)</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- 變數與設定 ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI 元素
+        const surfaceSelect = document.getElementById('surfaceSelect');
+        const angleInput = document.getElementById('angleInput');
+        const angleValue = document.getElementById('angleValue');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const showPathCheck = document.getElementById('showPathCheck');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const rAngleDisplay = document.getElementById('refractionAngleDisplay');
+        const calculationDisplay = document.getElementById('calculationDisplay');
+        const hud = document.getElementById('hud');
+        const hudLocation = document.getElementById('hudLocation');
+        const hudSpeedBar = document.getElementById('hudSpeedBar');
+        const hudLeftWheel = document.getElementById('hudLeftWheel');
+        const hudRightWheel = document.getElementById('hudRightWheel');
+        const turnAlert = document.getElementById('turnAlert');
+        const legendSurfaceColor = document.getElementById('legendSurfaceColor');
+
+        // 物理常數
+        const CAR_WIDTH = 50;  // 車寬
+        const CAR_LENGTH = 80; // 車長
+        const BASE_SPEED = 5;  // 基礎像素/幀
+        
+        // 狀態變數
+        let animationId = null;
+        let isRunning = false;
+        let boundaryY = 0; // 地面交界線 Y 座標
+
+        // 車輛物件 - 預先定義，避免初始化時 undefined
+        let car = {
+            x: 0,
+            y: 0,
+            angle: 0,      
+            speed: 0,
+            path: [],      
+            state: 'asphalt', 
+            ratio: 0.6 // 預設值
+        };
+
+        // 材質顏色映射
+        const surfaceColors = {
+            '0.9': '#94a3b8', // 混凝土 (灰藍)
+            '0.6': '#b45309', // 泥地 (棕)
+            '0.4': '#d97706', // 沙地 (橘黃)
+            '0.25': '#365314' // 沼澤 (深綠)
+        };
+
+        // --- 核心邏輯 ---
+
+        // 初始化 Canvas 大小
+        function resizeCanvas() {
+            if (!canvas.parentElement) return; 
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            boundaryY = canvas.height / 2;
+            drawStatic(); // 繪製背景
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 更新數學計算顯示
+        function updateCalculation(angle1Deg, angle2Deg, n1, ratio) {
+            let htmlContent = '';
+
+            // 避免除以零
+            if (Math.abs(angle2Deg) < 0.1) {
+                // 垂直入射情況
+                const n2 = n1 / ratio;
+                htmlContent = `
+                    <div class="flex flex-col gap-1 text-center">
+                        <div class="mb-1">垂直入射 (\\(\\theta_1 = 0^\\circ\\))</div>
+                        <div>\\(\\theta_2 = 0^\\circ\\)</div>
+                        <div class="mt-2 text-blue-600 font-bold text-sm">
+                        \\[
+                        \\begin{align*}
+                        n_2 &= \\frac{v_1}{v_2} n_1 \\\\
+                        &= \\frac{1}{${ratio}} \\\\
+                        &\\approx ${n2.toFixed(2)}
+                        \\end{align*}
+                        \\]
+                        </div>
+                    </div>
+                `;
+            } else {
+                const sin1 = Math.sin(angle1Deg * Math.PI / 180).toFixed(3);
+                const sin2 = Math.sin(angle2Deg * Math.PI / 180).toFixed(3);
+                const n2 = (n1 * Math.sin(angle1Deg * Math.PI / 180) / Math.sin(angle2Deg * Math.PI / 180)).toFixed(2);
+                
+                // 使用 MathJax 語法顯示詳細運算步驟，並使用 align* 環境對齊等號
+                htmlContent = `
+                    <div class="flex flex-col gap-1 text-center">
+                        <div>已知 \\(n_1 \\approx 1.0\\) (柏油路)</div>
+                        <div>\\(\\theta_1 = ${angle1Deg}^\\circ\\), \\(\\theta_2 \\approx ${angle2Deg}^\\circ\\)</div>
+                        <div class="border-t border-gray-200 my-1"></div>
+                        <div class="text-sm">根據斯涅耳定律：</div>
+                        <div class="overflow-x-auto overflow-y-hidden text-sm">
+                        \\[
+                        \\begin{align*}
+                        n_1 \\sin \\theta_1 &= n_2 \\sin \\theta_2 \\\\
+                        1.0 \\sin ${angle1Deg}^\\circ &= n_2 \\sin ${angle2Deg}^\\circ \\\\
+                        1.0 \\times ${sin1} &\\approx n_2 \\times ${sin2} \\\\
+                        n_2 &\\approx \\frac{1.0 \\times ${sin1}}{${sin2}} \\\\
+                        n_2 &\\approx \\mathbf{${n2}}
+                        \\end{align*}
+                        \\]
+                        </div>
+                    </div>
+                `;
+            }
+
+            calculationDisplay.innerHTML = htmlContent;
+            
+            // 觸發 MathJax 渲染新內容
+            if (window.MathJax) {
+               MathJax.typesetPromise([calculationDisplay]).catch(()=>{});
+            }
+        }
+
+        // 重置模擬
+        function initSimulation() {
+            // 停止動畫
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = false;
+            hud.classList.add('hidden');
+
+            boundaryY = canvas.height / 2;
+            const incidenceAngleDeg = parseInt(angleInput.value);
+            const incidenceAngleRad = incidenceAngleDeg * Math.PI / 180;
+            const surfaceRatio = parseFloat(surfaceSelect.value);
+
+            // 更新 UI 顯示數值
+            speedDisplay.textContent = (surfaceRatio * 100).toFixed(0) + "%";
+            legendSurfaceColor.style.backgroundColor = surfaceColors[surfaceSelect.value];
+            
+            // 計算折射角 (Snell's Law: n1 sin1 = n2 sin2 => sin1/v1 = sin2/v2)
+            // v1 = 1, v2 = ratio. sin2 = sin1 * ratio
+            const sinRefracted = Math.sin(incidenceAngleRad) * surfaceRatio;
+            const refractedAngleRad = Math.asin(sinRefracted);
+            const refractedAngleDeg = (refractedAngleRad * 180 / Math.PI).toFixed(1);
+            rAngleDisplay.textContent = refractedAngleDeg + "°";
+
+            // 更新計算面板
+            updateCalculation(incidenceAngleDeg, refractedAngleDeg, 1.0, surfaceRatio);
+
+            // 設定車輛起始位置
+            const startY = 80;
+            const dy = boundaryY - startY;
+            const dx = dy * Math.tan(incidenceAngleRad);
+            
+            car = {
+                x: (canvas.width / 2) - dx,
+                y: startY,
+                angle: incidenceAngleRad,
+                speed: BASE_SPEED,
+                path: [],
+                state: 'asphalt',
+                ratio: surfaceRatio,
+                targetAngle: refractedAngleRad
+            };
+
+            // 初始路徑點
+            car.path.push({x: car.x, y: car.y});
+            
+            drawStatic();
+            drawCar(car);
+        }
+
+        // 動畫循環
+        function animate() {
+            if (!isRunning) return;
+
+            updatePhysics();
+            drawStatic();
+            drawCar(car);
+
+            // 邊界檢查
+            if (car.y > canvas.height + 100 || car.x > canvas.width + 100 || car.x < -100) {
+                isRunning = false;
+                startBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                    </svg>
+                    重新播放
+                `;
+            } else {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+        // 物理計算更新
+        function updatePhysics() {
+            car.x += car.speed * Math.sin(car.angle);
+            car.y += car.speed * Math.cos(car.angle);
+
+            const lastP = car.path[car.path.length - 1];
+            if (Math.hypot(car.x - lastP.x, car.y - lastP.y) > 5) {
+                car.path.push({x: car.x, y: car.y});
+            }
+
+            const distToBoundary = car.y - boundaryY;
+            hud.classList.remove('hidden');
+            
+            if (distToBoundary < -CAR_LENGTH/2) {
+                car.speed = BASE_SPEED;
+                car.state = 'asphalt';
+                hudLocation.textContent = "柏油路 (介質 1)";
+                hudLocation.className = "text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-800";
+                hudSpeedBar.style.width = "100%";
+                hudSpeedBar.className = "h-full bg-blue-500";
+                hudLeftWheel.className = "w-3 h-3 rounded-full bg-green-500"; 
+                hudRightWheel.className = "w-3 h-3 rounded-full bg-green-500";
+                turnAlert.classList.add('hidden');
+
+            } else if (distToBoundary >= -CAR_LENGTH/2 && distToBoundary <= CAR_LENGTH/2) {
+                car.state = 'crossing';
+                const progress = (distToBoundary + CAR_LENGTH/2) / CAR_LENGTH; 
+                const angleDiff = car.targetAngle - parseFloat(angleInput.value * Math.PI / 180);
+                car.speed = BASE_SPEED * (1 - progress * (1 - car.ratio));
+                
+                if (Math.abs(car.targetAngle) > 0.01) {
+                    const startAngle = parseFloat(angleInput.value * Math.PI / 180);
+                    car.angle = startAngle + (angleDiff * progress);
+                    turnAlert.classList.remove('hidden');
+                    if(car.angle > startAngle) {
+                        turnAlert.innerHTML = "⚡ 左輪尚在快區，右輪已入慢區，車身<b>右轉</b>！";
+                    } else {
+                         turnAlert.innerHTML = "⚡ 轉向中...";
+                    }
+                }
+
+                hudLocation.textContent = "穿越邊界中...";
+                hudLocation.className = "text-xs font-bold px-2 py-0.5 rounded bg-yellow-100 text-yellow-800";
+                hudSpeedBar.style.width = (car.speed / BASE_SPEED * 100) + "%";
+                
+                if (car.angle > 0) {
+                     hudLeftWheel.className = "w-3 h-3 rounded-full bg-green-500"; 
+                     hudRightWheel.className = "w-3 h-3 rounded-full bg-red-500 animate-pulse";   
+                }
+
+            } else {
+                car.speed = BASE_SPEED * car.ratio;
+                car.angle = car.targetAngle; 
+                car.state = 'surface2';
+                
+                hudLocation.textContent = surfaceSelect.options[surfaceSelect.selectedIndex].text.split('(')[0];
+                hudLocation.className = "text-xs font-bold px-2 py-0.5 rounded bg-orange-100 text-orange-800";
+                hudSpeedBar.style.width = (car.ratio * 100) + "%";
+                hudSpeedBar.className = "h-full bg-red-500";
+                hudLeftWheel.className = "w-3 h-3 rounded-full bg-red-500";
+                hudRightWheel.className = "w-3 h-3 rounded-full bg-red-500";
+                turnAlert.classList.add('hidden');
+            }
+        }
+
+        // --- 繪圖函數 (助手函數) ---
+        
+        // 繪製箭頭
+        function drawArrow(ctx, fromX, fromY, toX, toY) {
+            const headlen = 10; 
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            
+            // 線
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            // 箭頭頭部 (放在線的中點)
+            const midX = (fromX + toX) / 2;
+            const midY = (fromY + toY) / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(midX, midY);
+            ctx.lineTo(midX - headlen * Math.cos(angle - Math.PI / 6), midY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(midX, midY);
+            ctx.lineTo(midX - headlen * Math.cos(angle + Math.PI / 6), midY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+        }
+
+        // 繪製角度扇形
+        function drawAngleArc(ctx, x, y, radius, startAngle, endAngle, label, color) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, radius, startAngle, endAngle, startAngle > endAngle); 
+            
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = color.replace('0.3', '1.0');
+            ctx.stroke();
+
+            // 標籤文字
+            const midAngle = (startAngle + endAngle) / 2;
+            const textRadius = radius + 25;
+            const textX = x + Math.cos(midAngle) * textRadius;
+            const textY = y + Math.sin(midAngle) * textRadius;
+
+            ctx.fillStyle = "#ffffff";
+            // 修改字型為斜體 serif，使其看起來更像物理公式
+            ctx.font = "bold italic 16px 'Times New Roman', serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            const textWidth = ctx.measureText(label).width;
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(textX - textWidth/2 - 4, textY - 10, textWidth + 8, 20);
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(label, textX, textY);
+        }
+
+
+        function drawStatic() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 繪製背景
+            ctx.fillStyle = '#334155'; 
+            ctx.fillRect(0, 0, canvas.width, boundaryY);
+            
+            // 下半部：選擇的材質
+            let safeRatio = '0.6'; 
+            if (typeof car !== 'undefined' && car && car.ratio !== undefined && car.ratio !== null) {
+                safeRatio = car.ratio;
+            } else if (surfaceSelect && surfaceSelect.value) {
+                safeRatio = surfaceSelect.value;
+            }
+            const ratioStr = String(safeRatio);
+
+            ctx.fillStyle = surfaceColors[ratioStr] || '#b45309';
+            ctx.fillRect(0, boundaryY, canvas.width, canvas.height - boundaryY);
+
+            // 2. 繪製邊界線
+            ctx.beginPath();
+            ctx.moveTo(0, boundaryY);
+            ctx.lineTo(canvas.width, boundaryY);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 新增：繪製介質文字標籤
+            const selectedText = surfaceSelect.options[surfaceSelect.selectedIndex].text.split('(')[0].trim();
+            ctx.font = "bold 16px Arial";
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.textAlign = "right";
+            // 上方
+            ctx.fillText("介質 1: 柏油路", canvas.width - 20, boundaryY - 15);
+            // 下方
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.fillText(`介質 2: ${selectedText}`, canvas.width - 20, boundaryY + 25);
+
+
+            // 3. 繪製光線圖 (法線、角度、光線路徑)
+            if (showPathCheck.checked) {
+                const centerX = canvas.width / 2;
+                const centerY = boundaryY;
+                
+                // --- A. 法線 ---
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, canvas.height);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]); 
+
+                // 取得角度資料
+                const angleI_Deg = parseInt(angleInput.value);
+                const angleI_Rad = angleI_Deg * Math.PI / 180;
+                
+                // 計算折射角 (用於繪製理論路徑)
+                const currentRatio = parseFloat(ratioStr);
+                const angleR_Rad = Math.asin(Math.sin(angleI_Rad) * currentRatio);
+                const angleR_Deg = (angleR_Rad * 180 / Math.PI).toFixed(1);
+
+                // --- B. 繪製理論光線 (黃色線 + 箭頭) ---
+                ctx.strokeStyle = 'rgba(255, 223, 0, 0.6)'; // 金黃色
+                ctx.lineWidth = 3;
+
+                // 入射光線
+                const rayLen = 300;
+                const startX = centerX - rayLen * Math.sin(angleI_Rad);
+                const startY = centerY - rayLen * Math.cos(angleI_Rad);
+                drawArrow(ctx, startX, startY, centerX, centerY);
+
+                // 折射光線
+                const endX = centerX + rayLen * Math.sin(angleR_Rad);
+                const endY = centerY + rayLen * Math.cos(angleR_Rad);
+                drawArrow(ctx, centerX, centerY, endX, endY);
+
+                // --- C. 繪製角度扇形 ---
+                // 使用小寫 theta 並使用 Unicode 下標
+                if (angleI_Deg > 0) {
+                    drawAngleArc(ctx, centerX, centerY, 60, -Math.PI/2 - angleI_Rad, -Math.PI/2, `θ₁=${angleI_Deg}°`, 'rgba(59, 130, 246, 0.5)'); // Blue
+                }
+                if (angleR_Rad > 0) {
+                    drawAngleArc(ctx, centerX, centerY, 60, Math.PI/2 - angleR_Rad, Math.PI/2, `θ₂=${angleR_Deg}°`, 'rgba(239, 68, 68, 0.5)'); // Red
+                }
+            }
+            
+            // 4. 繪製實際車輛軌跡 (白色虛線)
+            if (showPathCheck.checked && car && car.path && car.path.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(car.path[0].x, car.path[0].y);
+                for (let i = 1; i < car.path.length; i++) {
+                    ctx.lineTo(car.path[i].x, car.path[i].y);
+                }
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([2, 4]); // 虛線區分
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function drawCar(carObj) {
+            if (!carObj) return; 
+            ctx.save();
+            ctx.translate(carObj.x, carObj.y);
+            ctx.rotate(-carObj.angle);
+
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 5;
+
+            ctx.fillStyle = '#ef4444'; 
+            ctx.fillRect(-CAR_WIDTH/2, -CAR_LENGTH/2, CAR_WIDTH, CAR_LENGTH);
+            
+            ctx.fillStyle = '#7f1d1d';
+            ctx.fillRect(-CAR_WIDTH/2 + 5, -CAR_LENGTH/4, CAR_WIDTH - 10, CAR_LENGTH/2);
+            ctx.shadowBlur = 0; 
+
+            const wheelW = 10;
+            const wheelH = 18;
+            const wheelX = CAR_WIDTH/2; 
+            const wheelY = CAR_LENGTH/3;
+
+            const getWheelColor = (isFront, isRight) => {
+                if (carObj.state === 'crossing') {
+                    if (isFront && isRight && carObj.angle > 0) return '#450a0a'; 
+                }
+                if (carObj.state === 'surface2') return '#450a0a';
+                return '#000000'; 
+            };
+
+            ctx.fillStyle = getWheelColor(true, false);
+            ctx.fillRect(-wheelX - wheelW/2, wheelY - wheelH/2, wheelW, wheelH);
+            ctx.fillStyle = getWheelColor(true, true);
+            ctx.fillRect(wheelX - wheelW/2, wheelY - wheelH/2, wheelW, wheelH);
+            ctx.fillStyle = getWheelColor(false, false);
+            ctx.fillRect(-wheelX - wheelW/2, -wheelY - wheelH/2, wheelW, wheelH);
+            ctx.fillStyle = getWheelColor(false, true);
+            ctx.fillRect(wheelX - wheelW/2, -wheelY - wheelH/2, wheelW, wheelH);
+
+            ctx.fillStyle = '#fef08a';
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.arc(-CAR_WIDTH/2 + 8, CAR_LENGTH/2, 4, 0, Math.PI*2);
+            ctx.arc(CAR_WIDTH/2 - 8, CAR_LENGTH/2, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -10);
+            ctx.lineTo(0, 20);
+            ctx.lineTo(-4, 16);
+            ctx.moveTo(0, 20);
+            ctx.lineTo(4, 16);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- 事件監聽 ---
+        
+        angleInput.addEventListener('input', (e) => {
+            angleValue.textContent = e.target.value + "°";
+            initSimulation();
+        });
+
+        surfaceSelect.addEventListener('change', () => {
+            initSimulation();
+        });
+
+        showPathCheck.addEventListener('change', () => {
+            if (!isRunning) {
+                drawStatic();
+                drawCar(car);
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (isRunning) return;
+            
+            startBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                行駛中...
+            `;
+            startBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            
+            initSimulation(); 
+            isRunning = true;
+            animate();
+        });
+
+        setInterval(() => {
+            if (!isRunning && startBtn.innerText.includes("行駛中")) {
+                 startBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                    </svg>
+                    重新播放
+                `;
+                startBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }, 500);
+
+        resetBtn.addEventListener('click', () => {
+            initSimulation();
+            startBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                開始模擬
+            `;
+            startBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+        });
+
+        resizeCanvas();
+        initSimulation();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弗朗荷夫線 (Fraunhofer Lines) 實驗室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        /* 自定義光譜漸層 */
+        .spectrum-gradient {
+            background: linear-gradient(to right, 
+                #4b0082, /* 400nm Violet */
+                #0000ff, /* Blue */
+                #00ff00, /* Green */
+                #ffff00, /* Yellow */
+                #ff7f00, /* Orange */
+                #ff0000  /* 700nm Red */
+            );
+        }
+        
+        /* 發光效果 */
+        .emission-line {
+            box-shadow: 0 0 8px currentColor;
+            transition: height 0.2s, transform 0.2s;
+        }
+        
+        .emission-line:hover {
+            height: 120% !important; /* Hover 時稍微變長，增加互動感 */
+            top: -10% !important;
+            z-index: 50;
+        }
+
+        /* 太陽光束動畫 */
+        @keyframes beam-travel {
+            0% { opacity: 0; transform: translateX(0); }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(200px); }
+        }
+        .beam-particle {
+            animation: beam-travel 2.5s infinite linear;
+        }
+        
+        /* 大氣層脈動 */
+        @keyframes atmosphere-pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); border-color: rgba(148, 163, 184, 0.3); }
+            50% { transform: translate(-50%, -50%) scale(1.05); border-color: rgba(148, 163, 184, 0.5); }
+        }
+        .atmosphere-ring {
+            animation: atmosphere-pulse 4s infinite ease-in-out;
+        }
+        
+        /* 點擊彈出的 Tooltip 動畫 */
+        @keyframes pop-in {
+            0% { transform: translate(-50%, 10px) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+        }
+        .click-tooltip {
+            animation: pop-in 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col">
+
+    <!-- 導航欄 -->
+    <nav class="bg-slate-800 border-b border-slate-700 p-4 shadow-md sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-yellow-500 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.6)]"></div>
+                <h1 class="text-xl font-bold text-white">物理實驗室：弗朗荷夫線</h1>
+            </div>
+            <button onclick="toggleModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition duration-200 flex items-center gap-2 text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                </svg>
+                實驗原理
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow container mx-auto p-4 md:p-8 space-y-8">
+
+        <!-- 第一部分：太陽光模型 -->
+        <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl font-bold select-none">Sun</div>
+            <h2 class="text-lg font-semibold mb-6 text-blue-300 flex items-center">
+                <span class="bg-blue-900 text-blue-300 w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-xs">1</span>
+                光的路徑模型
+            </h2>
+            
+            <div class="flex items-center justify-between gap-4 md:gap-12 py-8 relative px-4 md:px-20">
+                <!-- 太陽系統 (包含大氣層) -->
+                <div class="text-center z-10 relative group">
+                    <!-- 使用獨立的容器來定位太陽與大氣，確保圓心對齊 -->
+                    <div class="relative w-32 h-32 mx-auto flex items-center justify-center">
+                        
+                        <!-- 外層：太陽大氣 (吸收層) -->
+                        <div class="absolute top-1/2 left-1/2 w-40 h-40 rounded-full border-4 border-dashed border-slate-500 bg-slate-800/30 atmosphere-ring flex items-center justify-center pointer-events-none">
+                        </div>
+                        
+                        <!-- 標籤：大氣層 (浮動於上方) -->
+                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 w-max bg-slate-700 text-xs px-2 py-1 rounded border border-slate-600 text-slate-300 z-20">
+                            外圍：冷氣體吸收層 (H, He)
+                        </div>
+
+                        <!-- 核心：太陽光球 -->
+                        <div class="w-24 h-24 bg-yellow-400 rounded-full shadow-[0_0_60px_rgba(250,204,21,0.8)] relative flex items-center justify-center z-10">
+                            <span class="text-yellow-900 font-bold text-lg drop-shadow-sm">太陽</span>
+                        </div>
+                    </div>
+                    
+                    <p class="mt-4 text-sm text-slate-400">光源中心 (連續光譜)</p>
+                </div>
+
+                <!-- 光線路徑 -->
+                <div class="flex-1 relative h-24 flex items-center mx-4">
+                    <!-- 箭頭背景 -->
+                    <div class="w-full h-1 bg-gradient-to-r from-yellow-400 to-blue-400 opacity-20"></div>
+                    
+                    <!-- 粒子動畫 -->
+                    <div class="absolute inset-0 overflow-hidden">
+                        <div class="absolute top-1/2 left-0 w-2 h-2 bg-white rounded-full beam-particle" style="animation-delay: 0s;"></div>
+                        <div class="absolute top-1/2 left-0 w-2 h-2 bg-white rounded-full beam-particle" style="animation-delay: 0.8s;"></div>
+                        <div class="absolute top-1/2 left-0 w-2 h-2 bg-white rounded-full beam-particle" style="animation-delay: 1.6s;"></div>
+                    </div>
+
+                    <!-- 說明標籤 -->
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-8 text-xs text-slate-500 bg-slate-900/80 px-2 py-1 rounded whitespace-nowrap">
+                        光子穿越大氣後射向地球
+                    </div>
+                </div>
+
+                <!-- 地球/觀察者 -->
+                <div class="text-center z-10">
+                    <div class="w-32 h-32 mx-auto flex items-center justify-center">
+                        <div class="w-20 h-20 bg-blue-600 rounded-full shadow-[0_0_30px_rgba(37,99,235,0.4)] flex items-center justify-center overflow-hidden relative border-2 border-blue-400/30">
+                            <div class="absolute w-full h-full bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/240px-The_Earth_seen_from_Apollo_17.jpg')] bg-cover bg-center opacity-90"></div>
+                            <span class="relative z-10 font-bold text-white drop-shadow-md">地球</span>
+                        </div>
+                    </div>
+                    <p class="mt-4 text-sm text-slate-400">觀察者 (接收光譜)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第二部分：光譜展示區 -->
+        <section class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+            <div class="flex justify-between items-end mb-6">
+                <h2 class="text-lg font-semibold text-blue-300 flex items-center">
+                    <span class="bg-blue-900 text-blue-300 w-6 h-6 rounded-full inline-flex items-center justify-center mr-2 text-xs">2</span>
+                    光譜分析與比較
+                </h2>
+                
+                <!-- 控制開關 -->
+                <label class="flex items-center cursor-pointer gap-3 bg-slate-900 px-4 py-2 rounded-lg border border-slate-700 hover:border-blue-500 transition select-none">
+                    <span class="text-sm font-medium text-slate-300">顯示對應關係</span>
+                    <div class="relative">
+                        <input type="checkbox" id="matchToggle" class="sr-only" onchange="toggleMatchLines()">
+                        <div class="w-10 h-6 bg-slate-700 rounded-full shadow-inner transition-colors duration-300" id="toggleBg"></div>
+                        <div class="dot absolute w-4 h-4 bg-white rounded-full shadow top-1 left-1 transition-transform duration-300" id="toggleDot"></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- 光譜堆疊容器 -->
+            <!-- 這裡需要一個相對定位的父容器來放置 Canvas -->
+            <div class="relative space-y-8 pb-4 main-spectrum-container">
+                <!-- 連線層 Canvas (絕對定位覆蓋整個堆疊區域) -->
+                <canvas id="connectionCanvas" class="absolute top-0 left-0 w-full h-full pointer-events-none z-30 opacity-0 transition-opacity duration-500"></canvas>
+
+                <!-- 1. 太陽光譜 (吸收) -->
+                <div class="relative group">
+                    <div class="flex justify-between text-xs text-slate-400 mb-1 px-1 font-mono">
+                        <span>400nm</span>
+                        <span class="font-bold text-white font-sans">太陽可見光譜 (吸收光譜)</span>
+                        <span>700nm</span>
+                    </div>
+                    
+                    <div class="h-20 w-full rounded bg-slate-900 relative">
+                        <!-- 刻度尺 -->
+                        <div class="absolute -top-1 left-0 w-full h-full flex justify-between px-[1px] opacity-20 z-0 pointer-events-none">
+                            <div class="w-px h-full bg-white"></div>
+                            <div class="w-px h-full bg-white"></div>
+                            <div class="w-px h-full bg-white"></div>
+                            <div class="w-px h-full bg-white"></div>
+                            <div class="w-px h-full bg-white"></div>
+                        </div>
+                        <!-- 光譜本體 -->
+                        <div class="h-full w-full rounded border border-slate-500 shadow-inner spectrum-gradient relative overflow-hidden z-10" id="solarSpectrum">
+                            <!-- 吸收線將由 JS 生成 -->
+                        </div>
+                    </div>
+                    
+                    <div class="text-xs text-yellow-500 mt-1 opacity-0 group-hover:opacity-100 transition text-center">
+                        * 黑線顯示被吸收的特定波長
+                    </div>
+                </div>
+
+                <!-- 2. 氫光譜 -->
+                <div class="relative">
+                    <div class="flex justify-between text-xs text-slate-400 mb-1 px-1 font-mono">
+                        <span>400nm</span>
+                        <span class="font-bold text-blue-400 font-sans">氫 (Hydrogen) 發射光譜 <span class="text-xs font-normal text-slate-500 ml-2">(點擊亮線查看波長)</span></span>
+                        <span>700nm</span>
+                    </div>
+                    <div class="h-16 w-full bg-black rounded border border-slate-600 shadow-inner relative overflow-visible" id="hydrogenSpectrum">
+                        <!-- 發射線由 JS 生成 -->
+                    </div>
+                </div>
+
+                <!-- 3. 氦光譜 -->
+                <div class="relative">
+                    <div class="flex justify-between text-xs text-slate-400 mb-1 px-1 font-mono">
+                        <span>400nm</span>
+                        <span class="font-bold text-green-400 font-sans">氦 (Helium) 發射光譜 <span class="text-xs font-normal text-slate-500 ml-2">(點擊亮線查看波長)</span></span>
+                        <span>700nm</span>
+                    </div>
+                    <div class="h-16 w-full bg-black rounded border border-slate-600 shadow-inner relative overflow-visible" id="heliumSpectrum">
+                        <!-- 發射線由 JS 生成 -->
+                    </div>
+                </div>
+            </div>
+            
+            <p class="mt-4 text-sm text-slate-400 text-center italic bg-slate-900/50 p-2 rounded">
+                觀察重點：請注意下方元素的亮線（發射線）與上方太陽光譜中的黑線（吸收線）在垂直位置上是否完全吻合。
+            </p>
+        </section>
+
+        <!-- 底部資訊 -->
+        <footer class="text-center text-slate-500 text-sm py-4">
+            <p>© 物理教學演示模型 | Fraunhofer Lines Experiment</p>
+        </footer>
+
+    </main>
+
+    <!-- Modal (實驗原理) -->
+    <div id="infoModal" class="fixed inset-0 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <!-- 背景遮罩 -->
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" onclick="toggleModal()"></div>
+
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-2xl bg-slate-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-slate-600">
+                    
+                    <!-- Modal Header -->
+                    <div class="bg-slate-700 px-4 py-3 sm:px-6 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold leading-6 text-white" id="modal-title">關於 Fraunhofer Lines</h3>
+                        <button onclick="toggleModal()" class="text-slate-400 hover:text-white transition">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="px-4 py-5 sm:p-6 text-slate-300 space-y-4 max-h-[70vh] overflow-y-auto">
+                        <div>
+                            <h4 class="text-blue-400 font-bold mb-2">歷史背景</h4>
+                            <p class="text-sm leading-relaxed">
+                                1814年，德國物理學家 <strong>約瑟夫·馮·弗朗荷夫 (Joseph von Fraunhofer)</strong> 發明了分光儀，他在觀察太陽光譜時，發現彩虹般的連續光譜中夾雜著數百條細微的黑線。他仔細測量了其中最明顯的 574 條線的波長，這些線後來被稱為「弗朗荷夫線」。
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                            <h4 class="text-yellow-400 font-bold mb-2">實驗原理：克希荷夫定律</h4>
+                            <p class="text-sm leading-relaxed mb-2">
+                                後來，克希荷夫 (Kirchhoff) 和 本生 (Bunsen) 發現了光譜分析的關鍵秘密：
+                            </p>
+                            <ul class="list-disc list-inside text-sm space-y-1 ml-2">
+                                <li><span class="text-white">熱的固體/液體</span> 會發出連續光譜（彩虹）。</li>
+                                <li><span class="text-white">熱的稀薄氣體</span> 會發出特定波長的亮線（發射光譜）。</li>
+                                <li><span class="text-white">冷氣體位於連續光源前</span> 會吸收它能發出的特定波長，形成黑線（吸收光譜）。</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h4 class="text-green-400 font-bold mb-2">這說明了什麼？</h4>
+                            <p class="text-sm leading-relaxed">
+                                當我們看到太陽光譜中的黑線（吸收線）與地球上氫氣或氦氣加熱時發出的亮線（發射線）位置完全重合時，我們就能斷定：<strong>太陽的大氣層中含有氫和氦</strong>。這就是人類如何在不飛向太陽的情況下，知道恆星成分的方法。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="bg-slate-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button" onclick="toggleModal()" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto">
+                            明白了
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 配置數據
+        const MIN_WAVELENGTH = 400;
+        const MAX_WAVELENGTH = 700;
+        
+        // 主要的 Fraunhofer 線
+        const spectralData = [
+            { label: 'G', wavelength: 430, element: 'Fe/Ca', color: '#4b0082', type: 'other' }, 
+            { label: 'h', wavelength: 410, element: 'H', color: '#7a26c9', type: 'H' },   
+            { label: 'g', wavelength: 434, element: 'H', color: '#0000ff', type: 'H' },   
+            { label: 'F', wavelength: 486, element: 'H', color: '#00ffff', type: 'H' },   
+            { label: 'b', wavelength: 517, element: 'Mg', color: '#00ff00', type: 'other' }, 
+            { label: 'E', wavelength: 527, element: 'Fe', color: '#33ff00', type: 'other' }, 
+            { label: 'D3', wavelength: 587.6, element: 'He', color: '#ffff00', type: 'He' }, 
+            { label: 'D', wavelength: 589, element: 'Na', color: '#ffcc00', type: 'other' }, 
+            { label: 'C', wavelength: 656, element: 'H', color: '#ff0000', type: 'H' },   
+            { label: 'r', wavelength: 667.8, element: 'He', color: '#ff2200', type: 'He' }, 
+            { label: 'B', wavelength: 687, element: 'O2', color: '#cc0000', type: 'other' },
+            { label: 'He-B', wavelength: 447.1, element: 'He', color: '#0033ff', type: 'He' }, 
+            { label: 'He-G', wavelength: 501.6, element: 'He', color: '#00ff99', type: 'He' }, 
+            { label: 'He-Y', wavelength: 706.5, element: 'He', color: '#990000', type: 'He' }  
+        ];
+
+        // 初始化 DOM
+        const solarContainer = document.getElementById('solarSpectrum');
+        const hContainer = document.getElementById('hydrogenSpectrum');
+        const heContainer = document.getElementById('heliumSpectrum');
+        
+        // 計算百分比位置
+        function getPosition(nm) {
+            return ((nm - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH)) * 100;
+        }
+
+        // 繪製光譜線
+        function drawSpectra() {
+            // 清空容器
+            solarContainer.innerHTML = '';
+            hContainer.innerHTML = '';
+            heContainer.innerHTML = '';
+
+            spectralData.forEach(line => {
+                const pos = getPosition(line.wavelength);
+                if(pos < 0 || pos > 100) return;
+
+                // 1. 繪製太陽光譜中的吸收線
+                const solarLine = document.createElement('div');
+                solarLine.className = 'absolute top-0 bottom-0 bg-black/80 w-[2px] z-20 flex flex-col items-center group cursor-help';
+                solarLine.style.left = `${pos}%`;
+                
+                // Tooltip
+                solarLine.innerHTML = `
+                    <div class="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap transition-opacity pointer-events-none border border-slate-600 z-30">
+                        ${line.element} (${line.wavelength}nm)
+                    </div>
+                `;
+                
+                // 加粗特定線條
+                if (['C', 'F', 'D', 'G'].includes(line.label)) {
+                    solarLine.classList.add('w-[3px]', 'bg-black');
+                }
+                
+                solarContainer.appendChild(solarLine);
+
+                // 2. 繪製元素發射光譜 (亮線)
+                if (line.type === 'H') {
+                    createEmissionLine(hContainer, pos, line.color, line.wavelength);
+                } else if (line.type === 'He') {
+                    createEmissionLine(heContainer, pos, line.color, line.wavelength);
+                }
+            });
+        }
+
+        function createEmissionLine(container, pos, color, wavelength) {
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'absolute top-0 bottom-0 w-[3px] emission-line z-10 cursor-pointer'; 
+            lineDiv.style.left = `${pos}%`;
+            lineDiv.style.backgroundColor = color;
+            lineDiv.style.color = color; 
+            
+            // 點擊事件
+            lineDiv.onclick = (e) => {
+                e.stopPropagation(); // 防止事件冒泡
+                
+                // 移除該容器中現有的 tooltip
+                const existing = container.querySelectorAll('.click-tooltip');
+                existing.forEach(el => el.remove());
+
+                // 創建新的 tooltip
+                const tip = document.createElement('div');
+                tip.className = 'click-tooltip absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-xs px-3 py-1 rounded font-bold shadow-lg z-50 whitespace-nowrap border border-slate-300';
+                tip.innerHTML = `<span style="color:${color}">●</span> ${wavelength} nm`;
+                
+                // 將 tooltip 加入到 lineDiv 內部
+                lineDiv.appendChild(tip);
+
+                // 3秒後自動消失
+                setTimeout(() => {
+                    if(tip.parentNode) tip.remove();
+                }, 3000);
+            };
+
+            container.appendChild(lineDiv);
+        }
+
+        // 點擊空白處清除 Tooltip
+        document.addEventListener('click', () => {
+             const tooltips = document.querySelectorAll('.click-tooltip');
+             tooltips.forEach(t => t.remove());
+        });
+
+        function toggleModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function toggleMatchLines() {
+            const checkbox = document.getElementById('matchToggle');
+            const canvas = document.getElementById('connectionCanvas');
+            const bg = document.getElementById('toggleBg');
+            const dot = document.getElementById('toggleDot');
+
+            if (checkbox.checked) {
+                bg.classList.remove('bg-slate-700');
+                bg.classList.add('bg-blue-600');
+                dot.classList.add('translate-x-4');
+                canvas.classList.remove('opacity-0');
+                drawConnections();
+            } else {
+                bg.classList.add('bg-slate-700');
+                bg.classList.remove('bg-blue-600');
+                dot.classList.remove('translate-x-4');
+                canvas.classList.add('opacity-0');
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // 重寫的繪製連接線函數 (基於數學位置計算，確保絕對垂直)
+        function drawConnections() {
+            const canvas = document.getElementById('connectionCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 獲取主容器和子容器的資訊
+            const mainContainer = document.querySelector('.main-spectrum-container');
+            
+            // 設定 Canvas 解析度匹配容器寬高
+            canvas.width = mainContainer.offsetWidth;
+            canvas.height = mainContainer.offsetHeight;
+
+            // 獲取各光譜容器的垂直位置
+            const solarRect = solarContainer.getBoundingClientRect();
+            const hRect = hContainer.getBoundingClientRect();
+            const heRect = heContainer.getBoundingClientRect();
+            const mainRect = mainContainer.getBoundingClientRect();
+
+            // 計算各個容器相對於 Canvas 的 Y 軸位置
+            const solarBottomY = solarRect.bottom - mainRect.top;
+            const hBottomY = hRect.bottom - mainRect.top;
+            const heBottomY = heRect.bottom - mainRect.top;
+
+            // 設定虛線樣式
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+
+            // 計算 X 軸可用寬度 (扣除邊框)
+            // solarContainer 繼承了父層 w-full, 但有 1px 邊框. 
+            // 光譜線 left: % 是相對於 content box 的
+            const contentWidth = solarContainer.clientWidth; 
+            
+            // 計算偏移量: Canvas 左上角到 solarContainer 內容左邊緣的距離
+            // solarRect.left 包含了邊框，所以要加邊框寬度 (clientLeft)
+            const xOffset = (solarRect.left + solarContainer.clientLeft) - mainRect.left;
+
+            spectralData.forEach(line => {
+                const pos = getPosition(line.wavelength);
+                if(pos < 0 || pos > 100) return;
+
+                if (line.type === 'H' || line.type === 'He') {
+                    // 計算精確的 X 座標
+                    // 公式: 偏移 + (內容寬度 * 百分比) + 線寬修正(1.5px 是 3px 線的中心)
+                    const x = xOffset + (contentWidth * (pos / 100)) + 1.5;
+                    
+                    // 繪製垂直線
+                    ctx.beginPath();
+                    ctx.moveTo(x, solarBottomY);
+
+                    let endY = 0;
+                    if (line.type === 'H') {
+                        endY = hBottomY;
+                    } else if (line.type === 'He') {
+                        endY = heBottomY;
+                    }
+
+                    ctx.lineTo(x, endY);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        drawSpectra();
+
+        // 監聽 Resize
+        window.addEventListener('resize', () => {
+            if(document.getElementById('matchToggle').checked) {
+                drawConnections();
+            }
+        });
+
+    </script>
+</body>
+</html>

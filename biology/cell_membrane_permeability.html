@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>細胞膜穿透性模擬教學</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax for rendering chemical formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation;
+        }
+        .lipid-head {
+            fill: #60A5FA; /* Blue-400 */
+            stroke: #2563EB; /* Blue-600 */
+            stroke-width: 2;
+        }
+        .lipid-tail {
+            stroke: #FCD34D; /* Yellow-300 */
+            stroke-width: 3;
+            fill: none;
+            stroke-linecap: round;
+        }
+        .protein {
+            fill: #A78BFA; /* Purple-400 */
+            stroke: #7C3AED; /* Purple-600 */
+            stroke-width: 3;
+        }
+        .particle {
+            transition: opacity 0.5s;
+        }
+        .fade-out {
+            opacity: 0;
+        }
+        /* Style adjustments for MathJax to blend in buttons */
+        mjx-container {
+            font-size: 1.1em !important;
+            color: inherit !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl text-center mb-6">
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">🧬 細胞膜物質穿透模擬</h1>
+        <p class="text-slate-600">流體鑲嵌模型：物質進出細胞的機制</p>
+    </header>
+
+    <!-- Main Interface -->
+    <main class="w-full max-w-4xl bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
+        
+        <!-- Controls Area -->
+        <div class="bg-slate-100 p-4 border-b border-slate-200">
+            
+            <!-- Import Section -->
+            <div class="mb-4">
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">進入細胞 (Import)</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <button onclick="startSimulation('oxygen', 'in')" class="flex flex-col items-center justify-center p-3 bg-white hover:bg-blue-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-4 h-4 rounded-full bg-red-500 mb-2"></div>
+                        <span class="font-medium text-slate-700 group-hover:text-blue-600">氧氣 (\(O_2\))</span>
+                    </button>
+                    <button onclick="startSimulation('water', 'in')" class="flex flex-col items-center justify-center p-3 bg-white hover:bg-blue-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-4 h-4 rounded-full bg-blue-400 mb-2"></div>
+                        <span class="font-medium text-slate-700 group-hover:text-blue-600">水 (\(H_2O\))</span>
+                    </button>
+                    <button onclick="startSimulation('glucose', 'in')" class="flex flex-col items-center justify-center p-3 bg-white hover:bg-blue-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-6 h-6 rotate-45 border-2 border-green-600 bg-green-100 mb-1"></div>
+                        <span class="font-medium text-slate-700 group-hover:text-blue-600">葡萄糖</span>
+                    </button>
+                    <button onclick="startSimulation('ion_na', 'in')" class="flex flex-col items-center justify-center p-3 bg-white hover:bg-blue-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-5 h-5 rounded-full border-2 border-orange-500 flex items-center justify-center text-[10px] font-bold text-orange-600 mb-1">Na<sup>+</sup></div>
+                        <span class="font-medium text-slate-700 group-hover:text-blue-600">鈉離子 (\(Na^+\))</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Export Section -->
+            <div>
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">離開細胞 (Export)</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="startSimulation('co2', 'out')" class="flex items-center justify-center space-x-3 p-3 bg-white hover:bg-pink-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-5 h-4 rounded-lg bg-gray-500"></div>
+                        <span class="font-medium text-slate-700 group-hover:text-pink-600">二氧化碳 (\(CO_2\))</span>
+                    </button>
+                    <button onclick="startSimulation('ion_k', 'out')" class="flex items-center justify-center space-x-3 p-3 bg-white hover:bg-pink-50 border border-slate-300 rounded-lg transition-all hover:shadow-md active:scale-95 group">
+                        <div class="w-5 h-5 rounded-full border-2 border-purple-500 flex items-center justify-center text-[10px] font-bold text-purple-600">K<sup>+</sup></div>
+                        <span class="font-medium text-slate-700 group-hover:text-pink-600">鉀離子 (\(K^+\))</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Simulation Canvas Area -->
+        <div class="relative w-full h-[400px] bg-gradient-to-b from-blue-50 via-white to-pink-50 overflow-hidden select-none" id="canvas-container">
+            
+            <!-- Labels (Absolute Positioned) -->
+            <div class="absolute top-2 left-2 bg-blue-100/80 px-2 py-1 rounded text-xs text-blue-800 font-bold border border-blue-200 z-10">
+                細胞外 (Extracellular)
+            </div>
+            <div class="absolute bottom-2 left-2 bg-pink-100/80 px-2 py-1 rounded text-xs text-pink-800 font-bold border border-pink-200 z-10">
+                細胞內 (Intracellular)
+            </div>
+
+            <!-- SVG Layer for Membrane Structure -->
+            <svg id="membrane-svg" class="w-full h-full absolute top-0 left-0" preserveAspectRatio="none">
+                <!-- Content generated by JS -->
+            </svg>
+
+            <!-- Particles Layer -->
+            <div id="particle-layer" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
+
+            <!-- Labels for Structure (Floating) -->
+            <div class="absolute top-[135px] right-[10%] text-xs bg-white/90 px-2 py-1 rounded shadow pointer-events-none border border-slate-300">
+                <span class="block font-bold text-blue-600">親水性頭部</span>
+            </div>
+            <div class="absolute top-[245px] right-[10%] text-xs bg-white/90 px-2 py-1 rounded shadow pointer-events-none border border-slate-300">
+                <span class="block font-bold text-yellow-600">疏水性尾部</span>
+            </div>
+            <div class="absolute top-[190px] left-[52%] transform -translate-x-1/2 text-xs bg-purple-100/90 px-2 py-1 rounded shadow pointer-events-none border border-purple-300 text-center">
+                <span class="block font-bold text-purple-700">運輸蛋白</span>
+            </div>
+        </div>
+
+        <!-- Explanation / Feedback Box -->
+        <div class="bg-slate-50 p-6 border-t border-slate-200 min-h-[160px]">
+            <div class="flex items-start space-x-4">
+                <div class="hidden md:block text-4xl pt-1">💡</div>
+                <div class="flex-1">
+                    <h3 id="info-title" class="text-lg font-bold text-slate-800 mb-2">請選擇上方物質進行實驗</h3>
+                    <div id="info-text" class="text-slate-600 leading-relaxed text-sm md:text-base">
+                        細胞膜由磷脂雙分子層組成，具有「選擇性透性」。請點擊按鈕觀察物質如何進入或離開細胞。
+                    </div>
+                    <div id="info-tag" class="mt-3 inline-block px-3 py-1 rounded-full text-sm font-medium hidden"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-8 text-center text-slate-400 text-sm">
+        <p>Biology Interactive Tool © 2024</p>
+    </footer>
+
+    <script>
+        // Configuration
+        const membraneY = 160; // Top of membrane
+        const membraneHeight = 80; // Thickness of lipid bilayer
+        const proteinCenter = 50; // Percentage X
+        const proteinWidthPercent = 10; // Width of protein channel in %
+
+        // State
+        let particles = [];
+        let animationId;
+        const svg = document.getElementById('membrane-svg');
+        const particleLayer = document.getElementById('particle-layer');
+        const infoTitle = document.getElementById('info-title');
+        const infoText = document.getElementById('info-text');
+        const infoTag = document.getElementById('info-tag');
+
+        // Initialization
+        window.onload = function() {
+            drawMembrane();
+            animate();
+            // Force MathJax to render initial static content
+            if (window.MathJax) {
+                MathJax.typesetPromise();
+            }
+        };
+
+        window.onresize = function() {
+            svg.innerHTML = ''; 
+            drawMembrane();
+        }
+
+        // 1. Drawing the Membrane Structure
+        function drawMembrane() {
+            const width = svg.clientWidth;
+            const lipidWidth = 25;
+            const count = Math.ceil(width / lipidWidth);
+            
+            // Calculate Protein Gap
+            const pCenterPx = width * (proteinCenter / 100);
+            const pHalfWidthPx = (width * (proteinWidthPercent / 100)) / 2;
+            const gapStart = pCenterPx - pHalfWidthPx;
+            const gapEnd = pCenterPx + pHalfWidthPx;
+
+            let lipidHTML = '';
+
+            for (let i = 0; i < count; i++) {
+                const x = i * lipidWidth + (lipidWidth/2);
+                if (x > gapStart && x < gapEnd) continue;
+                // Top Layer
+                lipidHTML += createLipid(x, membraneY, false);
+                // Bottom Layer
+                lipidHTML += createLipid(x, membraneY + membraneHeight, true);
+            }
+
+            // Draw Protein Channel
+            const proteinPath = `
+                M ${gapStart + 5}, ${membraneY - 10} 
+                L ${gapStart + 5}, ${membraneY + membraneHeight + 10} 
+                Q ${gapStart + 5}, ${membraneY + membraneHeight + 20} ${gapStart + 20}, ${membraneY + membraneHeight + 20}
+                L ${gapEnd - 20}, ${membraneY + membraneHeight + 20}
+                Q ${gapEnd - 5}, ${membraneY + membraneHeight + 20} ${gapEnd - 5}, ${membraneY + membraneHeight + 10}
+                L ${gapEnd - 5}, ${membraneY - 10}
+                Q ${gapEnd - 5}, ${membraneY - 20} ${gapEnd - 20}, ${membraneY - 20}
+                L ${gapStart + 20}, ${membraneY - 20}
+                Q ${gapStart + 5}, ${membraneY - 20} ${gapStart + 5}, ${membraneY - 10}
+                Z
+            `;
+            
+            // Channel pore (visual only)
+            const porePath = `
+                M ${pCenterPx - 5}, ${membraneY - 20}
+                L ${pCenterPx - 5}, ${membraneY + membraneHeight + 20}
+                L ${pCenterPx + 5}, ${membraneY + membraneHeight + 20}
+                L ${pCenterPx + 5}, ${membraneY - 20}
+                Z
+            `;
+
+            lipidHTML += `<path d="${proteinPath}" class="protein" opacity="0.9" />`;
+            lipidHTML += `<path d="${porePath}" fill="#7C3AED" opacity="0.3" />`;
+
+            svg.innerHTML = lipidHTML;
+        }
+
+        function createLipid(x, y, isBottom) {
+            const tailLength = 35;
+            const headRadius = 8;
+            const direction = isBottom ? -1 : 1;
+            const tailWiggle1 = Math.random() * 6 - 3;
+            const tailWiggle2 = Math.random() * 6 - 3;
+
+            return `
+                <line x1="${x-3}" y1="${y}" x2="${x-3 + tailWiggle1}" y2="${y + (tailLength * direction)}" class="lipid-tail" />
+                <line x1="${x+3}" y1="${y}" x2="${x+3 + tailWiggle2}" y2="${y + (tailLength * direction)}" class="lipid-tail" />
+                <circle cx="${x}" cy="${y}" r="${headRadius}" class="lipid-head" />
+            `;
+        }
+
+        // 2. Simulation Logic
+        function startSimulation(type, direction = 'in') {
+            updateInfoBox(type, direction);
+            
+            let count = 0;
+            const interval = setInterval(() => {
+                spawnParticle(type, direction);
+                count++;
+                if(count >= 8) clearInterval(interval);
+            }, 300);
+        }
+
+        function spawnParticle(type, direction) {
+            const el = document.createElement('div');
+            el.className = 'absolute transition-transform';
+            
+            const startXPercent = Math.random() * 90 + 5; 
+            const containerWidth = particleLayer.clientWidth;
+            const containerHeight = particleLayer.clientHeight;
+            const xPos = (startXPercent / 100) * containerWidth;
+            
+            let startY, initialVy;
+
+            if (direction === 'in') {
+                startY = -30;
+                initialVy = 1.5 + Math.random(); // Moving Down
+            } else {
+                startY = containerHeight + 10; // Start from bottom
+                initialVy = -(1.5 + Math.random()); // Moving Up (negative Y)
+            }
+
+            // Style based on type
+            if (type === 'oxygen') {
+                el.innerHTML = '<div class="w-4 h-4 rounded-full bg-red-500 shadow-sm opacity-90"></div>';
+            } else if (type === 'water') {
+                el.innerHTML = '<div class="w-3 h-3 rounded-full bg-blue-400 shadow-sm opacity-80"></div>';
+            } else if (type === 'glucose') {
+                el.innerHTML = '<div class="w-6 h-6 bg-green-100 border-2 border-green-600 rotate-45 shadow-sm"></div>';
+            } else if (type === 'ion_na') {
+                el.innerHTML = '<div class="w-5 h-5 rounded-full bg-white border-2 border-orange-500 text-[10px] flex items-center justify-center font-bold text-orange-600 leading-none pb-[1px]">Na<sup>+</sup></div>';
+            } else if (type === 'co2') {
+                el.innerHTML = '<div class="w-5 h-4 rounded-lg bg-gray-500 shadow-sm opacity-90"></div>';
+            } else if (type === 'ion_k') {
+                el.innerHTML = '<div class="w-5 h-5 rounded-full bg-white border-2 border-purple-500 text-[10px] flex items-center justify-center font-bold text-purple-600 leading-none pb-[1px]">K<sup>+</sup></div>';
+            }
+
+            el.style.left = xPos + 'px';
+            el.style.top = startY + 'px';
+            
+            particleLayer.appendChild(el);
+
+            particles.push({
+                element: el,
+                type: type,
+                x: xPos,
+                y: startY,
+                vx: 0,
+                vy: initialVy,
+                active: true,
+                passed: false,
+                direction: direction // 'in' or 'out'
+            });
+        }
+
+        function animate() {
+            const containerWidth = particleLayer.clientWidth;
+            const containerHeight = particleLayer.clientHeight;
+            const pCenterPx = containerWidth * (proteinCenter / 100);
+            const pHalfWidthPx = (containerWidth * (proteinWidthPercent / 100)) / 2;
+            const gapStart = pCenterPx - pHalfWidthPx + 10;
+            const gapEnd = pCenterPx + pHalfWidthPx - 10;
+
+            particles.forEach((p, index) => {
+                if (!p.active) return;
+
+                p.y += p.vy;
+                
+                // Brownian motion
+                if(p.type !== 'glucose') { 
+                    p.x += (Math.random() - 0.5) * 1; 
+                }
+                
+                const membraneTop = membraneY - 10;
+                const membraneBottom = membraneY + membraneHeight + 10;
+
+                // COLLISION LOGIC
+                // Check if particle is currently INSIDE the vertical band of the membrane
+                if (p.y > membraneTop && p.y < membraneBottom && !p.passed) {
+                    
+                    const isOverChannel = (p.x > gapStart && p.x < gapEnd);
+
+                    if (isOverChannel) {
+                        // Facilitated Diffusion / Channel
+                        // Accelerate through channel
+                        p.vy = (p.direction === 'in') ? 2.5 : -2.5; 
+                        p.x += (pCenterPx - p.x) * 0.1; // Attraction to center
+                    } else {
+                        // Hitting the Lipid Bilayer
+                        
+                        // Permeable substances
+                        if (p.type === 'oxygen' || p.type === 'co2') {
+                            // Simple Diffusion
+                            // Slow down slightly in lipid
+                            p.vy = (p.direction === 'in') ? 1.2 : -1.2;
+                        } else if (p.type === 'water') {
+                            // Osmosis (Simplified)
+                            p.vy = (p.direction === 'in') ? 0.8 : -0.8;
+                        } else {
+                            // Impermeable substances (Glucose, Ions) -> Bounce
+                            p.vy = -p.vy * 1.5; // Reverse direction and fast bounce
+                            p.element.classList.add('fade-out');
+                            p.active = false;
+                            
+                            setTimeout(() => {
+                                if(p.element.parentNode) p.element.parentNode.removeChild(p.element);
+                            }, 500);
+                        }
+                    }
+                }
+
+                // Update DOM
+                p.element.style.top = p.y + 'px';
+                p.element.style.left = p.x + 'px';
+
+                // Cleanup off screen
+                if (p.y > containerHeight + 50 || p.y < -50) {
+                    p.active = false;
+                    if(p.element.parentNode) p.element.parentNode.removeChild(p.element);
+                }
+            });
+
+            particles = particles.filter(p => p.active || p.element.classList.contains('fade-out'));
+            requestAnimationFrame(animate);
+        }
+
+        // 3. Educational Content Logic
+        function updateInfoBox(type, direction) {
+            infoTag.classList.remove('hidden');
+            let title = "", desc = "", tagText = "", tagColor = "";
+
+            if (type === 'oxygen') {
+                title = "氧氣 \\(O_2\\) - 簡單擴散";
+                desc = "氧氣是非極性分子。雖然細胞膜的中心是疏水性的，但氧氣可以順著濃度梯度直接穿透磷脂雙分子層進入細胞，不需要耗能也不需要載體。";
+                tagText = "可自由穿透";
+                tagColor = "bg-green-100 text-green-800";
+            } else if (type === 'water') {
+                title = "水 \\(H_2O\\) - 滲透作用";
+                desc = "水是極性分子，但分子很小。它可以緩慢通過磷脂層，或更快速地通過特定的**水通道蛋白 (Aquaporins)** 進入細胞。";
+                tagText = "部分穿透 / 需通道";
+                tagColor = "bg-blue-100 text-blue-800";
+            } else if (type === 'glucose') {
+                title = "葡萄糖 (Glucose) - 促進性擴散";
+                desc = "葡萄糖是大分子且具極性，無法通過疏水性的磷脂層。它必須依靠細胞膜上的**載體蛋白**改變形狀來運送進入細胞。若未對準通道，則無法進入。";
+                tagText = "需載體蛋白";
+                tagColor = "bg-yellow-100 text-yellow-800";
+            } else if (type === 'ion_na') {
+                title = "鈉離子 \\(Na^+\\) - 離子通道";
+                desc = "帶電荷的 \\(Na^+\\) 極度親水，會被膜內的疏水尾部排斥。它必須通過專門的**離子通道**才能進入細胞。";
+                tagText = "需通道蛋白";
+                tagColor = "bg-orange-100 text-orange-800";
+            } else if (type === 'co2') {
+                title = "二氧化碳 \\(CO_2\\) - 廢物排出";
+                desc = "細胞呼吸會產生代謝廢物 \\(CO_2\\)。就像氧氣一樣，它是非極性小分子，可以從細胞內（高濃度）直接穿過磷脂層擴散到細胞外（低濃度）。";
+                tagText = "可自由穿透 (排出)";
+                tagColor = "bg-gray-200 text-gray-800";
+            } else if (type === 'ion_k') {
+                title = "鉀離子 \\(K^+\\) - 離子流出";
+                desc = "細胞內部的 \\(K^+\\) 濃度通常較高。它可以透過**鉀離子通道**（如滲漏通道）順濃度梯度擴散出細胞。因為帶電，它無法直接穿過磷脂層。";
+                tagText = "需通道蛋白 (排出)";
+                tagColor = "bg-purple-100 text-purple-800";
+            }
+
+            infoTitle.innerHTML = title;
+            infoText.innerHTML = desc;
+            infoTag.innerText = tagText;
+            infoTag.className = `mt-3 inline-block px-3 py-1 rounded-full text-sm font-medium ${tagColor}`;
+
+            // Trigger MathJax re-render
+            if (window.MathJax) {
+                MathJax.typesetPromise([infoTitle, infoText, infoTag]);
+            }
+        }
+    </script>
+</body>
+</html>

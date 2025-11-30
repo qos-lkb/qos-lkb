@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蓋革-彌勒計數器模擬實驗 (GM Counter Simulation)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax Configuration -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <!-- Load MathJax -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        /* 自定義一些滑桿樣式 */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -8px; 
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        .monitor-screen {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0f172a;
+            color: #22c55e;
+            text-shadow: 0 0 5px #22c55e;
+        }
+        .graph-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        /* Modal Transitions */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        body.modal-active {
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-3">
+            <!-- 輻射符號 (Standard Radiation Trefoil - 3 Blades) -->
+            <svg class="w-8 h-8 text-yellow-500 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                <!-- Center Circle -->
+                <circle cx="12" cy="12" r="2.5" />
+                <!-- Blade 1 (0 to 60 deg) -->
+                <path d="M12,12 L22,12 A10,10 0 0,1 17,20.66 Z" />
+                <!-- Blade 2 (120 to 180 deg) -->
+                <path d="M12,12 L22,12 A10,10 0 0,1 17,20.66 Z" transform="rotate(120, 12, 12)" />
+                <!-- Blade 3 (240 to 300 deg) -->
+                <path d="M12,12 L22,12 A10,10 0 0,1 17,20.66 Z" transform="rotate(240, 12, 12)" />
+            </svg>
+            <h1 class="text-xl font-bold tracking-wide"><span data-i18n="app-title">蓋革-彌勒計數器 (GM Counter)</span></h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="openInfoModal()" class="bg-slate-700 hover:bg-slate-600 text-white text-sm px-3 py-1.5 rounded transition flex items-center gap-1">
+                <span>📖</span> <span data-i18n="btn-info">解說</span>
+            </button>
+            <button onclick="toggleLanguage()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-1.5 rounded transition">
+                <span>中 / Eng</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        
+        <!-- Left Panel: Controls -->
+        <aside class="w-full lg:w-1/3 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 overflow-y-auto z-10 shadow-lg">
+            
+            <!-- 1. Source Selection -->
+            <div class="space-y-3">
+                <h2 class="text-lg font-bold text-slate-700 border-b pb-2" data-i18n="sec-source">1. 選擇放射源</h2>
+                <div class="grid grid-cols-1 gap-2">
+                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="source" value="None" class="w-4 h-4 text-blue-600" onchange="updateSimulationParams()">
+                        <div class="ml-3">
+                            <span class="block font-medium text-slate-600" data-i18n="opt-none">無 (本底輻射 Only)</span>
+                            <span class="block text-xs text-slate-400" data-i18n="opt-none-desc">測量環境背景輻射</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="source" value="Am-241" checked class="w-4 h-4 text-blue-600" onchange="updateSimulationParams()">
+                        <div class="ml-3">
+                            <span class="block font-medium" data-i18n="src-am">鋂-241 (Am-241)</span>
+                            <span class="block text-xs text-slate-500"><span data-i18n="opt-rad-type">主要輻射</span>: Alpha (α)</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="source" value="Sr-90" class="w-4 h-4 text-blue-600" onchange="updateSimulationParams()">
+                        <div class="ml-3">
+                            <span class="block font-medium" data-i18n="src-sr">鍶-90 (Sr-90)</span>
+                            <span class="block text-xs text-slate-500"><span data-i18n="opt-rad-type">主要輻射</span>: Beta (β)</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input type="radio" name="source" value="Co-60" class="w-4 h-4 text-blue-600" onchange="updateSimulationParams()">
+                        <div class="ml-3">
+                            <span class="block font-medium" data-i18n="src-co">鈷-60 (Co-60)</span>
+                            <span class="block text-xs text-slate-500"><span data-i18n="opt-rad-type">主要輻射</span>: Gamma (γ)</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. Absorber Selection -->
+            <div class="space-y-3">
+                <h2 class="text-lg font-bold text-slate-700 border-b pb-2" data-i18n="sec-absorber">2. 選擇阻隔物</h2>
+                <div class="relative">
+                    <select id="select-absorber" onchange="updateSimulationParams()" class="block w-full p-3 border border-slate-300 rounded-lg bg-slate-50 focus:ring-blue-500 focus:border-blue-500 text-slate-700 font-medium">
+                        <option value="none">無 (None)</option>
+                        <option value="paper">紙張 (Paper)</option>
+                        <option value="aluminum">5mm 鋁板 (Aluminium)</option>
+                        <option value="lead-25">25mm 鉛塊 (Lead)</option>
+                        <option value="lead-50">50mm 鉛塊 (Lead)</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1 pl-1" data-i18n="hint-absorber">* 阻隔物固定放置於 3 cm 處</p>
+                </div>
+            </div>
+
+            <!-- 3. Parameters Sliders -->
+            <div class="space-y-6">
+                <h2 class="text-lg font-bold text-slate-700 border-b pb-2" data-i18n="sec-params">3. 實驗參數設定</h2>
+                
+                <!-- Activity -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-slate-700" data-i18n="lbl-activity">放射源活度</label>
+                        <span class="text-sm font-bold text-blue-600"><span id="val-activity">185</span> kBq</span>
+                    </div>
+                    <input type="range" id="slider-activity" min="0" max="200" value="185" class="w-full" oninput="updateSimulationParams()">
+                </div>
+
+                <!-- Distance -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-slate-700" data-i18n="lbl-distance">GM 管距離</label>
+                        <span class="text-sm font-bold text-blue-600"><span id="val-distance">10</span> cm</span>
+                    </div>
+                    <input type="range" id="slider-distance" min="8" max="50" step="0.5" value="10" class="w-full" oninput="updateSimulationParams()">
+                    <p class="text-xs text-slate-400 mt-1" data-i18n="hint-drag">提示：您也可以在右側畫面直接拖曳 GM 管</p>
+                </div>
+
+                <!-- Voltage -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-slate-700" data-i18n="lbl-voltage">GM 管電壓</label>
+                        <span class="text-sm font-bold text-blue-600"><span id="val-voltage">400</span> V</span>
+                    </div>
+                    <input type="range" id="slider-voltage" min="300" max="500" value="400" class="w-full" oninput="updateSimulationParams()">
+                </div>
+            </div>
+
+            <!-- 4. Timer Settings -->
+            <div class="space-y-3">
+                <h2 class="text-lg font-bold text-slate-700 border-b pb-2" data-i18n="sec-timer">4. 計時設定</h2>
+                <div class="relative">
+                    <select id="select-timer" onchange="updateSimulationParams()" class="block w-full p-3 border border-slate-300 rounded-lg bg-slate-50 focus:ring-blue-500 focus:border-blue-500 text-slate-700 font-medium">
+                        <option value="manual">手動停止 (Manual)</option>
+                        <option value="5">5s</option>
+                        <option value="10">10s</option>
+                        <option value="15">15s</option>
+                        <option value="20">20s</option>
+                        <option value="30">30s</option>
+                        <option value="45">45s</option>
+                        <option value="60">60s (1 min)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="mt-auto grid grid-cols-3 gap-2">
+                <button onclick="toggleExperiment()" id="btn-toggle" class="col-span-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition shadow">
+                    <!-- Play Icon -->
+                    <svg id="icon-play" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <!-- Pause Icon (Hidden) -->
+                    <svg id="icon-pause" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span id="text-toggle" data-i18n="btn-start">開始實驗</span>
+                </button>
+                <button onclick="resetExperiment()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-lg flex items-center justify-center transition" title="Reset">
+                    <!-- Reset Icon -->
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Right Panel: Visualization -->
+        <section class="w-full lg:w-2/3 flex flex-col bg-slate-100 h-full overflow-hidden relative">
+            
+            <!-- Scene Visualization -->
+            <div class="h-[40%] relative bg-slate-800 border-b border-slate-600 shadow-inner flex flex-col items-center justify-center overflow-hidden shrink-0">
+                <canvas id="simCanvas" class="absolute inset-0 w-full h-full z-0 cursor-default"></canvas>
+                
+                <!-- Digital Readout Overlay -->
+                <div class="absolute top-4 right-4 bg-black border-2 border-slate-600 rounded-lg p-3 shadow-xl z-10 w-48 pointer-events-none select-none">
+                    <div class="text-xs text-slate-400 mb-1" data-i18n="dsp-counts">TOTAL COUNTS</div>
+                    <div id="display-counts" class="text-3xl font-mono text-red-500 font-bold text-right tracking-widest">00000</div>
+                    <div class="border-t border-slate-700 my-2"></div>
+                    <div class="text-xs text-slate-400 mb-1" data-i18n="dsp-time">TIME (s)</div>
+                    <div id="display-time" class="text-xl font-mono text-yellow-500 font-bold text-right">0.0</div>
+                    <div id="display-timer-target" class="text-[10px] text-slate-500 font-mono text-right hidden">/ 60s</div>
+                    <div class="border-t border-slate-700 my-2"></div>
+                    <div class="text-xs text-slate-400 mb-1" data-i18n="dsp-rate">RATE (CPM)</div>
+                    <div id="display-rate" class="text-xl font-mono text-green-500 font-bold text-right">0</div>
+                </div>
+
+                <!-- Label Overlay -->
+                <div class="absolute bottom-4 left-4 bg-white/10 backdrop-blur-sm rounded p-2 text-white text-xs z-10 flex gap-4 pointer-events-none select-none">
+                    <div><span data-i18n="lbl-source-short">來源</span>: <span id="label-source" class="font-bold">Co-60</span></div>
+                    <div><span data-i18n="lbl-dist-short">距離</span>: <span id="label-dist" class="font-bold">10</span> cm</div>
+                    <div><span data-i18n="lbl-abs-short">阻隔</span>: <span id="label-absorber" class="font-bold">None</span></div>
+                </div>
+                
+                <!-- Time's Up Notification -->
+                <div id="notification-finished" class="absolute inset-0 flex items-center justify-center bg-black/50 z-20 hidden pointer-events-none">
+                    <div class="bg-white text-slate-900 p-4 rounded-lg shadow-2xl transform scale-100 transition-transform">
+                        <div class="text-lg font-bold text-center" data-i18n="msg-finished">計時結束</div>
+                        <div class="text-sm text-slate-600 text-center" data-i18n="msg-paused">實驗已自動暫停</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph Section -->
+            <div class="flex-1 bg-white p-4 flex flex-col min-h-0">
+                <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
+                    <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+                        <span data-i18n="graph-title">圖表顯示:</span>
+                        <div class="flex rounded-md shadow-sm" role="group">
+                            <button onclick="setGraphMode('rate')" id="btn-mode-rate" class="graph-btn active px-3 py-1 text-xs font-medium border border-slate-300 rounded-l-lg hover:bg-slate-100 focus:z-10 focus:ring-2 focus:ring-blue-500 text-slate-700" data-i18n="graph-rate">
+                                計數率 (CPM)
+                            </button>
+                            <button onclick="setGraphMode('total')" id="btn-mode-total" class="graph-btn px-3 py-1 text-xs font-medium border border-l-0 border-slate-300 rounded-r-lg hover:bg-slate-100 focus:z-10 focus:ring-2 focus:ring-blue-500 text-slate-700" data-i18n="graph-total">
+                                總計數 (Counts)
+                            </button>
+                        </div>
+                    </h3>
+                    <div class="flex gap-2 text-xs">
+                         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-full"></span> <span data-i18n="legend-data">實驗數據</span></span>
+                    </div>
+                </div>
+                <div class="relative w-full h-full border border-slate-200 rounded bg-slate-50 overflow-hidden">
+                    <canvas id="graphCanvas" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-black opacity-50" onclick="closeInfoModal()"></div>
+        
+        <div class="modal-content bg-white w-11/12 md:w-3/4 lg:w-1/2 max-h-[90vh] overflow-y-auto rounded shadow-lg z-50 transform scale-95">
+            <div class="flex justify-between items-center pb-3 px-6 pt-4 border-b">
+                <p class="text-xl font-bold text-slate-800" data-i18n="modal-title">實驗原理解說</p>
+                <div class="cursor-pointer z-50" onclick="closeInfoModal()">
+                    <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                        <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="px-6 py-4 space-y-4 text-slate-700">
+                
+                <div>
+                    <h3 class="font-bold text-lg text-blue-700 mb-2" data-i18n="modal-h1">1. 輻射種類 (Radiation Types)</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-sm">
+                        <li><b class="text-red-500">Alpha (α)</b>: 氦原子核。射程極短 (空氣中約 3-5 cm)。穿透力弱，一張紙即可阻擋。 (例如: Am-241)</li>
+                        <li><b class="text-blue-500">Beta (β)</b>: 高速電子。射程中等 (空氣中約 1-2 m)。穿透力中等，5mm 鋁板可阻擋。 (例如: Sr-90)</li>
+                        <li><b class="text-yellow-600">Gamma (γ)</b>: 高頻電磁波。射程極長。穿透力極強，需要厚鉛塊才能顯著衰減。 (例如: Co-60)</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-blue-700 mb-2" data-i18n="modal-h2">2. 蓋革-彌勒計數器 (GM Counter) 原理</h3>
+                    <p class="text-sm" data-i18n="modal-p1">
+                        GM 管內充滿惰性氣體（如氬氣）。當輻射粒子進入管中時，會使氣體電離，產生電子和離子。
+                        在高電壓下，電子加速撞擊其他氣體分子，產生「電子崩 (Avalanche)」，在電路中形成一個可被偵測的電流脈衝（即一次「計數」或「咔」聲）。
+                    </p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-blue-700 mb-2" data-i18n="modal-h3">3. 實驗變因</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-sm">
+                        <li><b data-i18n="modal-term-dist">距離</b>: 輻射強度大致遵循反平方定律 ($I \propto 1/r^2$)，距離越遠，計數率越低。</li>
+                        <li><b data-i18n="modal-term-abs">阻隔物</b>: 不同材質對不同輻射有不同的屏蔽效果（紙張擋 α，鋁擋 β，鉛擋 γ）。</li>
+                        <li><b data-i18n="modal-term-bg">本底輻射</b>: 即使沒有放射源，環境中仍存在微量輻射（來自宇宙射線、地殼等），約每秒 0.5-1 次。</li>
+                    </ul>
+                </div>
+
+            </div>
+            
+            <div class="flex justify-end pt-2 px-6 pb-4">
+                <button class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded hover:bg-blue-600 transition" onclick="closeInfoModal()" data-i18n="modal-close">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Translations ---
+        const translations = {
+            'zh': {
+                'app-title': '蓋革-彌勒計數器 (GM Counter)',
+                'btn-info': '解說',
+                'sec-source': '1. 選擇放射源',
+                'opt-none': '無 (本底輻射 Only)',
+                'opt-none-desc': '測量環境背景輻射',
+                'opt-rad-type': '主要輻射',
+                
+                // Element Names
+                'src-am': '鋂-241 (Am-241)',
+                'src-sr': '鍶-90 (Sr-90)',
+                'src-co': '鈷-60 (Co-60)',
+
+                'sec-absorber': '2. 選擇阻隔物',
+                'hint-absorber': '* 阻隔物固定放置於 3 cm 處',
+                'sec-params': '3. 實驗參數設定',
+                'lbl-activity': '放射源活度',
+                'lbl-distance': 'GM 管距離',
+                'hint-drag': '提示：您也可以在右側畫面直接拖曳 GM 管',
+                'lbl-voltage': 'GM 管電壓',
+                'sec-timer': '4. 計時設定',
+                'btn-start': '開始實驗',
+                'btn-pause': '暫停實驗',
+                'btn-resume': '繼續實驗',
+                'btn-restart': '重新開始',
+                'dsp-counts': 'TOTAL COUNTS',
+                'dsp-time': 'TIME (s)',
+                'dsp-rate': 'RATE (CPM)',
+                'lbl-source-short': '來源',
+                'lbl-dist-short': '距離',
+                'lbl-abs-short': '阻隔',
+                'msg-finished': '計時結束',
+                'msg-paused': '實驗已自動暫停',
+                'graph-title': '圖表顯示:',
+                'graph-rate': '計數率 (CPM)',
+                'graph-total': '總計數 (Counts)',
+                'legend-data': '實驗數據',
+                
+                // Modal
+                'modal-title': '實驗原理解說',
+                'modal-h1': '1. 輻射種類 (Radiation Types)',
+                'modal-h2': '2. 蓋革-彌勒計數器 (GM Counter) 原理',
+                'modal-h3': '3. 實驗變因',
+                'modal-p1': 'GM 管內充滿惰性氣體（如氬氣）。當輻射粒子進入管中時，會使氣體電離，產生電子和離子。在高電壓下，電子加速撞擊其他氣體分子，產生「電子崩 (Avalanche)」，在電路中形成一個可被偵測的電流脈衝（即一次「計數」或「咔」聲）。',
+                'modal-term-dist': '距離',
+                'modal-term-abs': '阻隔物',
+                'modal-term-bg': '本底輻射',
+                'modal-close': '關閉',
+                
+                // Select Options (Dynamic handling needed)
+                'opt-paper': '紙張 (Paper)',
+                'opt-al': '5mm 鋁板 (Aluminium)',
+                'opt-pb25': '25mm 鉛塊 (Lead)',
+                'opt-pb50': '50mm 鉛塊 (Lead)',
+                'opt-manual': '手動停止 (Manual)',
+                'opt-none-abs': '無 (None)'
+            },
+            'en': {
+                'app-title': 'Geiger-Müller Counter',
+                'btn-info': 'Info',
+                'sec-source': '1. Select Source',
+                'opt-none': 'None (Background Only)',
+                'opt-none-desc': 'Measure background radiation',
+                'opt-rad-type': 'Type',
+
+                // Element Names
+                'src-am': 'Americium-241 (Am-241)',
+                'src-sr': 'Strontium-90 (Sr-90)',
+                'src-co': 'Cobalt-60 (Co-60)',
+
+                'sec-absorber': '2. Select Absorber',
+                'hint-absorber': '* Absorber fixed at 3 cm',
+                'sec-params': '3. Parameters',
+                'lbl-activity': 'Activity',
+                'lbl-distance': 'Distance',
+                'hint-drag': 'Tip: You can drag the GM tube on the right',
+                'lbl-voltage': 'Voltage',
+                'sec-timer': '4. Timer',
+                'btn-start': 'Start',
+                'btn-pause': 'Pause',
+                'btn-resume': 'Resume',
+                'btn-restart': 'Restart',
+                'dsp-counts': 'TOTAL COUNTS',
+                'dsp-time': 'TIME (s)',
+                'dsp-rate': 'RATE (CPM)',
+                'lbl-source-short': 'Source',
+                'lbl-dist-short': 'Dist',
+                'lbl-abs-short': 'Absorber',
+                'msg-finished': 'Time\'s Up',
+                'msg-paused': 'Experiment Paused',
+                'graph-title': 'Graph:',
+                'graph-rate': 'Rate (CPM)',
+                'graph-total': 'Total Counts',
+                'legend-data': 'Data',
+
+                // Modal
+                'modal-title': 'Experiment Info',
+                'modal-h1': '1. Radiation Types',
+                'modal-h2': '2. Principle of GM Counter',
+                'modal-h3': '3. Variables',
+                'modal-p1': 'The GM tube is filled with inert gas (e.g., Argon). When radiation enters, it ionizes the gas, creating electrons and ions. Under high voltage, electrons accelerate and collide with other molecules causing an "Electron Avalanche", creating a detectable current pulse (a "click").',
+                'modal-term-dist': 'Distance',
+                'modal-term-abs': 'Absorbers',
+                'modal-term-bg': 'Background',
+                'modal-close': 'Close',
+
+                 // Select Options
+                'opt-paper': 'Paper',
+                'opt-al': '5mm Aluminium',
+                'opt-pb25': '25mm Lead',
+                'opt-pb50': '50mm Lead',
+                'opt-manual': 'Manual Stop',
+                'opt-none-abs': 'None'
+            }
+        };
+
+        // --- State Variables ---
+        let state = {
+            isRunning: false,
+            sourceType: 'Am-241', 
+            absorber: 'none', 
+            activity: 185, 
+            distance: 10, 
+            voltage: 400, 
+            isDragging: false,
+            
+            targetTime: Infinity, 
+            
+            totalCounts: 0,
+            startTime: 0,
+            elapsedTime: 0,
+            lastFrameTime: 0,
+            
+            graphMode: 'rate',
+            dataPoints: [], 
+            historyLimit: 60, 
+            
+            lang: 'zh' // Default Language
+        };
+
+        const BG_RATE_CPS = 0.5; 
+        const SIM_SCALE_FACTOR = 0.5; 
+
+        // Canvas Contexts
+        const simCanvas = document.getElementById('simCanvas');
+        const simCtx = simCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        let audioCtx;
+        
+        // --- Initialization ---
+        window.addEventListener('resize', resizeCanvases);
+        
+        // Drag Events
+        simCanvas.addEventListener('mousedown', handleInputStart);
+        simCanvas.addEventListener('mousemove', handleInputMove);
+        window.addEventListener('mouseup', handleInputEnd);
+        simCanvas.addEventListener('touchstart', handleInputStart, {passive: false});
+        simCanvas.addEventListener('touchmove', handleInputMove, {passive: false});
+        window.addEventListener('touchend', handleInputEnd);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            resizeCanvases();
+            updateLanguage(); // Apply default lang text
+            updateSimulationParams(); 
+            requestAnimationFrame(gameLoop);
+            drawGraph();
+        });
+
+        // --- Language & Modal Logic ---
+
+        function toggleLanguage() {
+            state.lang = state.lang === 'zh' ? 'en' : 'zh';
+            updateLanguage();
+            updateSimulationParams(); // Refresh dynamic labels
+            drawGraph(); // Refresh graph labels
+        }
+
+        function updateLanguage() {
+            const t = translations[state.lang];
+            
+            // Switch button label code removed to keep "中 / Eng" static
+            
+            // Update all elements with data-i18n
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+
+            // Update specific button states if needed
+            const btnTextKey = state.isRunning ? 'btn-pause' : 'btn-start';
+            const btnEl = document.getElementById('text-toggle');
+            if (btnEl) btnEl.textContent = t[btnTextKey];
+
+            // Update Modal List Content (Specific HTML update)
+            updateModalContent(state.lang);
+        }
+
+        function updateModalContent(lang) {
+            const list1 = document.querySelector('ul.list-disc'); // First list (Types)
+            if (lang === 'zh') {
+                 list1.innerHTML = `
+                        <li><b class="text-red-500">Alpha (α)</b>: 氦原子核。射程極短 (空氣中約 3-5 cm)。穿透力弱，一張紙即可阻擋。 (例如: 鋂-241)</li>
+                        <li><b class="text-blue-500">Beta (β)</b>: 高速電子。射程中等 (空氣中約 1-2 m)。穿透力中等，5mm 鋁板可阻擋。 (例如: 鍶-90)</li>
+                        <li><b class="text-yellow-600">Gamma (γ)</b>: 高頻電磁波。射程極長。穿透力極強，需要厚鉛塊才能顯著衰減。 (例如: 鈷-60)</li>`;
+            } else {
+                 list1.innerHTML = `
+                        <li><b class="text-red-500">Alpha (α)</b>: Helium nucleus. Short range (~5cm in air). Low penetration (stopped by paper). (e.g., Am-241)</li>
+                        <li><b class="text-blue-500">Beta (β)</b>: Fast electron. Medium range (~1-2m in air). Medium penetration (stopped by 5mm Al). (e.g., Sr-90)</li>
+                        <li><b class="text-yellow-600">Gamma (γ)</b>: EM Wave. Long range. High penetration (reduced by thick Lead). (e.g., Co-60)</li>`;
+            }
+            
+            const list2 = document.querySelectorAll('ul.list-disc')[1]; // Second list (Variables)
+            if (lang === 'zh') {
+                list2.innerHTML = `
+                        <li><b>距離</b>: 輻射強度大致遵循反平方定律 ($I \\propto 1/r^2$)，距離越遠，計數率越低。</li>
+                        <li><b>阻隔物</b>: 不同材質對不同輻射有不同的屏蔽效果（紙張擋 α，鋁擋 β，鉛擋 γ）。</li>
+                        <li><b>本底輻射</b>: 即使沒有放射源，環境中仍存在微量輻射（來自宇宙射線、地殼等），約每秒 0.5-1 次。</li>`;
+            } else {
+                 list2.innerHTML = `
+                        <li><b>Distance</b>: Intensity follows Inverse Square Law ($I \\propto 1/r^2$). Further away = lower count rate.</li>
+                        <li><b>Absorbers</b>: Materials block different types (Paper stops α, Al stops β, Lead blocks γ).</li>
+                        <li><b>Background</b>: Low level radiation exists everywhere (Cosmic rays, etc.), ~0.5-1 CPS.</li>`;
+            }
+
+            // Trigger MathJax
+            if (window.MathJax) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function openInfoModal() {
+            const modal = document.getElementById('info-modal');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            document.body.classList.add('modal-active');
+        }
+
+        function closeInfoModal() {
+            const modal = document.getElementById('info-modal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            document.body.classList.remove('modal-active');
+        }
+
+        function resizeCanvases() {
+            simCanvas.width = simCanvas.parentElement.clientWidth;
+            simCanvas.height = simCanvas.parentElement.clientHeight;
+            graphCanvas.width = graphCanvas.parentElement.clientWidth;
+            graphCanvas.height = graphCanvas.parentElement.clientHeight;
+        }
+
+        // --- Dragging Logic ---
+
+        function getMousePos(evt) {
+            const rect = simCanvas.getBoundingClientRect();
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function handleInputStart(evt) {
+            const pos = getMousePos(evt);
+            const centerY = simCanvas.height / 2;
+            const cmToPx = (simCanvas.width * 0.7) / 50;
+            const sourceX = 50;
+            const tubeX = sourceX + (state.distance * cmToPx);
+
+            if (pos.x >= tubeX && pos.x <= tubeX + 80 && pos.y >= centerY - 25 && pos.y <= centerY + 25) {
+                state.isDragging = true;
+                if(evt.cancelable && evt.type === 'touchstart') evt.preventDefault(); 
+            }
+        }
+
+        function handleInputMove(evt) {
+            const pos = getMousePos(evt);
+            const centerY = simCanvas.height / 2;
+            const cmToPx = (simCanvas.width * 0.7) / 50;
+            const sourceX = 50;
+            const tubeX = sourceX + (state.distance * cmToPx);
+
+            let hovering = false;
+            if (pos.x >= tubeX && pos.x <= tubeX + 80 && pos.y >= centerY - 25 && pos.y <= centerY + 25) {
+                hovering = true;
+            }
+            simCanvas.style.cursor = (hovering || state.isDragging) ? 'grab' : 'default';
+            if(state.isDragging) simCanvas.style.cursor = 'grabbing';
+
+            if (state.isDragging) {
+                let newDist = (pos.x - sourceX) / cmToPx;
+                newDist = Math.max(8, Math.min(50, newDist));
+                state.distance = newDist;
+                
+                const slider = document.getElementById('slider-distance');
+                slider.value = newDist;
+                
+                document.getElementById('val-distance').textContent = newDist.toFixed(1);
+                updateLabelDist(newDist.toFixed(1));
+
+                if(evt.cancelable && evt.type === 'touchmove') evt.preventDefault();
+            }
+        }
+
+        function handleInputEnd(evt) {
+            state.isDragging = false;
+            simCanvas.style.cursor = 'default';
+        }
+
+        // --- Controls Logic ---
+        function updateSimulationParams() {
+            state.sourceType = document.querySelector('input[name="source"]:checked').value;
+            state.absorber = document.getElementById('select-absorber').value;
+            state.activity = parseInt(document.getElementById('slider-activity').value);
+            state.distance = parseFloat(document.getElementById('slider-distance').value);
+            state.voltage = parseInt(document.getElementById('slider-voltage').value);
+
+            // Timer Logic
+            const timerVal = document.getElementById('select-timer').value;
+            state.targetTime = timerVal === 'manual' ? Infinity : parseInt(timerVal);
+
+            // Update UI Labels
+            document.getElementById('val-activity').textContent = state.activity;
+            document.getElementById('val-distance').textContent = state.distance; 
+            document.getElementById('val-voltage').textContent = state.voltage;
+            
+            // Update labels with translation support
+            const t = translations[state.lang];
+            let sourceDisplay = state.sourceType;
+            
+            // Handle Source Display Text based on language
+            if (state.sourceType === 'None') {
+                sourceDisplay = (state.lang === 'zh' ? '無' : 'None');
+            } else if (state.sourceType === 'Am-241') {
+                sourceDisplay = (state.lang === 'zh' ? '鋂-241' : 'Am-241');
+            } else if (state.sourceType === 'Sr-90') {
+                sourceDisplay = (state.lang === 'zh' ? '鍶-90' : 'Sr-90');
+            } else if (state.sourceType === 'Co-60') {
+                sourceDisplay = (state.lang === 'zh' ? '鈷-60' : 'Co-60');
+            }
+
+            document.getElementById('label-source').textContent = sourceDisplay;
+            document.getElementById('label-dist').textContent = state.distance;
+            
+            // Show target time on display if active
+            const targetDisplay = document.getElementById('display-timer-target');
+            if (state.targetTime !== Infinity) {
+                targetDisplay.textContent = `/ ${state.targetTime}s`;
+                targetDisplay.classList.remove('hidden');
+            } else {
+                targetDisplay.classList.add('hidden');
+            }
+
+            // Map absorber value to localized text
+            let absorberText = "None";
+            switch(state.absorber) {
+                case 'none': absorberText = t['opt-none-abs']; break;
+                case 'paper': absorberText = t['opt-paper']; break;
+                case 'aluminum': absorberText = t['opt-al']; break;
+                case 'lead-25': absorberText = t['opt-pb25']; break;
+                case 'lead-50': absorberText = t['opt-pb50']; break;
+            }
+            document.getElementById('label-absorber').textContent = absorberText;
+            
+            // Update Select Options (Manual fix for select dropdowns)
+            updateSelectOptions();
+        }
+
+        function updateLabelDist(val) {
+            document.getElementById('label-dist').textContent = val;
+        }
+
+        function updateSelectOptions() {
+            const t = translations[state.lang];
+            
+            // Absorber Options
+            const absSel = document.getElementById('select-absorber');
+            absSel.options[0].text = t['opt-none-abs'];
+            absSel.options[1].text = t['opt-paper'];
+            absSel.options[2].text = t['opt-al'];
+            absSel.options[3].text = t['opt-pb25'];
+            absSel.options[4].text = t['opt-pb50'];
+
+            // Timer Options (Just the manual one really needs translation)
+            const timeSel = document.getElementById('select-timer');
+            timeSel.options[0].text = t['opt-manual'];
+        }
+
+        function setGraphMode(mode) {
+            state.graphMode = mode;
+            const btnRate = document.getElementById('btn-mode-rate');
+            const btnTotal = document.getElementById('btn-mode-total');
+            if (mode === 'rate') {
+                btnRate.classList.add('active');
+                btnTotal.classList.remove('active');
+            } else {
+                btnRate.classList.remove('active');
+                btnTotal.classList.add('active');
+            }
+            drawGraph();
+        }
+
+        function toggleExperiment() {
+            const t = translations[state.lang];
+            // Check if user is restarting a finished run without hitting reset first
+            if (!state.isRunning && state.targetTime !== Infinity && state.elapsedTime >= state.targetTime && state.elapsedTime > 0) {
+                resetExperiment(); 
+                setTimeout(startExperiment, 0);
+                return;
+            }
+
+            if (!state.isRunning) {
+                startExperiment();
+            } else {
+                pauseExperiment();
+            }
+        }
+
+        function startExperiment() {
+            const t = translations[state.lang];
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            document.getElementById('notification-finished').classList.add('hidden');
+
+            state.isRunning = true;
+            state.lastFrameTime = performance.now();
+            
+            document.getElementById('text-toggle').textContent = t['btn-pause'];
+            document.getElementById('btn-toggle').classList.replace('bg-green-600', 'bg-yellow-600');
+            document.getElementById('btn-toggle').classList.replace('hover:bg-green-700', 'hover:bg-yellow-700');
+            document.getElementById('icon-play').classList.add('hidden');
+            document.getElementById('icon-pause').classList.remove('hidden');
+        }
+
+        function pauseExperiment(finished = false) {
+            const t = translations[state.lang];
+            state.isRunning = false;
+            
+            document.getElementById('text-toggle').textContent = t['btn-resume'];
+            document.getElementById('btn-toggle').classList.replace('bg-yellow-600', 'bg-green-600');
+            document.getElementById('btn-toggle').classList.replace('hover:bg-yellow-700', 'hover:bg-green-700');
+            document.getElementById('icon-play').classList.remove('hidden');
+            document.getElementById('icon-pause').classList.add('hidden');
+
+            if (finished) {
+                document.getElementById('notification-finished').classList.remove('hidden');
+                document.getElementById('text-toggle').textContent = t['btn-restart']; 
+            }
+        }
+
+        function resetExperiment() {
+            const t = translations[state.lang];
+            pauseExperiment();
+            
+            document.getElementById('notification-finished').classList.add('hidden');
+            state.totalCounts = 0;
+            state.elapsedTime = 0.0;
+            state.dataPoints = [];
+            state.isRunning = false; 
+
+            document.getElementById('text-toggle').textContent = t['btn-start']; 
+            document.getElementById('btn-toggle').classList.replace('bg-yellow-600', 'bg-green-600');
+            document.getElementById('btn-toggle').classList.replace('hover:bg-yellow-700', 'hover:bg-green-700');
+            document.getElementById('icon-play').classList.remove('hidden');
+            document.getElementById('icon-pause').classList.add('hidden');
+
+            updateSimulationParams();
+            updateDisplays();
+            graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+        }
+
+        // --- Physics Engine ---
+
+        function calculateExpectedCPS() {
+            let vFactor = 0;
+            if (state.voltage < 325) vFactor = 0;
+            else if (state.voltage < 380) vFactor = (state.voltage - 325) / 55;
+            else if (state.voltage <= 460) vFactor = 1.0 + (state.voltage - 380) * 0.001;
+            else vFactor = 1.1 + (state.voltage - 460) * 0.05;
+
+            // Handle "No Source" - Background only
+            if (state.sourceType === 'None') {
+                let noise = 0;
+                if (state.voltage > 470) noise = Math.random() * (state.voltage - 470) * 2;
+                return (BG_RATE_CPS * vFactor) + noise;
+            }
+
+            // Normal Source Logic
+            const K = 200; 
+            let geomFactor = K / (state.distance * state.distance);
+
+            let transmissionFactor = 1.0;
+            if (state.sourceType === 'Am-241') {
+                if (state.distance > 4.5) transmissionFactor = 0.001;
+                else transmissionFactor = 1.0 - (state.distance / 5.0);
+                if (state.absorber !== 'none') transmissionFactor = 0; 
+            } else if (state.sourceType === 'Sr-90') {
+                transmissionFactor = Math.exp(-0.05 * state.distance); 
+                if (state.absorber === 'paper') transmissionFactor *= 0.95; 
+                else if (state.absorber === 'aluminum' || state.absorber.startsWith('lead')) transmissionFactor = 0; 
+            } else {
+                transmissionFactor = 0.99; 
+                if (state.absorber === 'paper') transmissionFactor *= 0.99;
+                else if (state.absorber === 'aluminum') transmissionFactor *= 0.95;
+                else if (state.absorber === 'lead-25') transmissionFactor *= 0.20; 
+                else if (state.absorber === 'lead-50') transmissionFactor *= 0.04; 
+            }
+
+            let cps = (state.activity * geomFactor * transmissionFactor * vFactor * SIM_SCALE_FACTOR) + BG_RATE_CPS;
+            
+            if (state.voltage > 470) {
+                cps += Math.random() * (state.voltage - 470) * 2;
+            }
+
+            return Math.max(0, cps);
+        }
+
+        function playClickSound() {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'square';
+            oscillator.frequency.value = 1000 + Math.random() * 500; 
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.05);
+        }
+
+        // --- Main Loop ---
+        let particles = [];
+
+        function gameLoop(currentTime) {
+            const dt = (currentTime - state.lastFrameTime) / 1000;
+            state.lastFrameTime = currentTime;
+
+            if (state.isRunning) {
+                state.elapsedTime += dt;
+
+                // Check Timer
+                if (state.targetTime !== Infinity && state.elapsedTime >= state.targetTime) {
+                    state.elapsedTime = state.targetTime; // Clamp
+                    pauseExperiment(true);
+                    updateDisplays(); 
+                } else {
+                    const expectedCPS = calculateExpectedCPS();
+                    const expectedClicks = expectedCPS * dt;
+                    let clicks = Math.floor(expectedClicks);
+                    if (Math.random() < (expectedClicks - clicks)) clicks++;
+
+                    if (clicks > 0) {
+                        state.totalCounts += clicks;
+                        if (clicks < 5 || Math.random() > 0.8) playClickSound();
+                        
+                        for(let i=0; i < Math.min(clicks, 5); i++) {
+                            particles.push({
+                                x: simCanvas.width * 0.8, 
+                                y: simCanvas.height / 2 + (Math.random() - 0.5) * 40,
+                                life: 1.0,
+                                type: 'hit',
+                                color: '#22c55e'
+                            });
+                        }
+                    }
+
+                    if (Math.floor(state.elapsedTime * 2) > state.dataPoints.length) {
+                        const cpm = expectedCPS * 60;
+                        state.dataPoints.push({
+                            time: state.elapsedTime,
+                            cpm: cpm,
+                            total: state.totalCounts
+                        });
+                        if (state.dataPoints.length > 300) state.dataPoints.shift();
+                    }
+
+                    updateDisplays();
+                }
+            }
+
+            drawSimulation();
+            drawGraph();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateDisplays() {
+            document.getElementById('display-counts').textContent = state.totalCounts.toString().padStart(5, '0');
+            document.getElementById('display-time').textContent = state.elapsedTime.toFixed(1);
+            
+            const rate = state.elapsedTime > 0 ? (state.totalCounts / state.elapsedTime * 60) : 0;
+            document.getElementById('display-rate').textContent = Math.round(rate);
+        }
+
+        // --- Drawing Logic ---
+
+        function drawSimulation() {
+            simCtx.fillStyle = '#1e293b'; 
+            simCtx.fillRect(0, 0, simCanvas.width, simCanvas.height);
+
+            const centerY = simCanvas.height / 2;
+            const cmToPx = (simCanvas.width * 0.7) / 50; 
+            const sourceX = 50; 
+            const tubeX = sourceX + (state.distance * cmToPx);
+            const absorberX = sourceX + (3 * cmToPx); 
+
+            // 1. Draw Ruler
+            simCtx.strokeStyle = '#64748b';
+            simCtx.lineWidth = 2;
+            simCtx.beginPath();
+            simCtx.moveTo(sourceX, centerY + 60);
+            simCtx.lineTo(sourceX + 50 * cmToPx + 20, centerY + 60); 
+            simCtx.stroke();
+            
+            simCtx.fillStyle = '#94a3b8';
+            simCtx.font = '10px Arial';
+            for(let cm=0; cm<=50; cm+=10) {
+                let x = sourceX + cm * cmToPx;
+                simCtx.fillRect(x, centerY + 55, 2, 10);
+                simCtx.fillText(cm + 'cm', x - 10, centerY + 80);
+            }
+
+            // 2. Draw Source (Only if not None)
+            if (state.sourceType !== 'None') {
+                let sourceColor = '#f59e0b'; 
+                if (state.sourceType === 'Am-241') sourceColor = '#ef4444'; 
+                if (state.sourceType === 'Sr-90') sourceColor = '#3b82f6'; 
+                
+                simCtx.fillStyle = '#334155'; 
+                simCtx.fillRect(sourceX - 5, centerY, 10, 60);
+                simCtx.fillStyle = '#cbd5e1'; 
+                simCtx.fillRect(sourceX - 15, centerY - 20, 30, 30);
+                simCtx.fillStyle = sourceColor;
+                simCtx.beginPath();
+                simCtx.arc(sourceX, centerY - 5, 8, 0, Math.PI * 2);
+                simCtx.fill();
+            } else {
+                simCtx.fillStyle = '#334155'; 
+                simCtx.fillRect(sourceX - 5, centerY, 10, 60);
+                simCtx.strokeStyle = '#475569';
+                simCtx.setLineDash([5, 5]);
+                simCtx.strokeRect(sourceX - 15, centerY - 20, 30, 30);
+                simCtx.setLineDash([]);
+            }
+
+            // 3. Draw Absorber (If active)
+            if (state.absorber !== 'none') {
+                let width = 2;
+                let height = 80;
+                let label = "";
+
+                // Simple check for localization here, drawing text on canvas
+                // It is simpler to use the global 'translations' object for this canvas label
+                const t = translations[state.lang];
+                
+                if (state.absorber === 'paper') {
+                    simCtx.fillStyle = '#f8fafc'; 
+                    width = 2;
+                    label = state.lang === 'zh' ? "Paper" : "Paper";
+                } else if (state.absorber === 'aluminum') {
+                    simCtx.fillStyle = '#cbd5e1'; 
+                    width = 6;
+                    label = state.lang === 'zh' ? "Al 5mm" : "Al 5mm";
+                } else if (state.absorber === 'lead-25') {
+                    simCtx.fillStyle = '#475569'; 
+                    width = 15;
+                    label = state.lang === 'zh' ? "Pb 25mm" : "Pb 25mm";
+                } else if (state.absorber === 'lead-50') {
+                    simCtx.fillStyle = '#334155'; 
+                    width = 30;
+                    label = state.lang === 'zh' ? "Pb 50mm" : "Pb 50mm";
+                }
+
+                simCtx.fillRect(absorberX - width/2, centerY - height/2, width, height);
+                simCtx.fillStyle = '#fff';
+                simCtx.font = '10px Arial';
+                simCtx.fillText(label, absorberX - 15, centerY - height/2 - 5);
+            }
+
+            // 4. Draw GM Tube
+            simCtx.fillStyle = '#0f172a'; 
+            simCtx.fillRect(tubeX, centerY - 15, 80, 30);
+            simCtx.fillStyle = '#64748b'; 
+            simCtx.fillRect(tubeX, centerY - 12, 5, 24);
+            
+            simCtx.fillStyle = '#475569';
+            simCtx.fillRect(tubeX + 35, centerY - 10, 10, 20); // grip
+
+            simCtx.strokeStyle = '#000';
+            simCtx.lineWidth = 3;
+            simCtx.beginPath();
+            simCtx.moveTo(tubeX + 80, centerY);
+            simCtx.bezierCurveTo(tubeX + 100, centerY, tubeX + 120, centerY + 100, tubeX + 150, centerY + 100);
+            simCtx.stroke();
+
+            // 5. Particles
+            if (state.isRunning) {
+                if (state.sourceType !== 'None') {
+                    if (Math.random() < state.activity / 300) { 
+                        let sourceColor = '#f59e0b';
+                        if (state.sourceType === 'Am-241') sourceColor = '#ef4444'; 
+                        if (state.sourceType === 'Sr-90') sourceColor = '#3b82f6';
+                        
+                        particles.push({
+                            x: sourceX + 10,
+                            y: centerY - 5,
+                            vx: 2 + Math.random() * 4,
+                            vy: (Math.random() - 0.5) * 1,
+                            life: 1.0,
+                            type: 'ray',
+                            color: sourceColor
+                        });
+                    }
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.life -= 0.02;
+                
+                if (p.type === 'ray') {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    
+                    if (state.sourceType === 'Am-241' && p.x > sourceX + (4.5 * cmToPx)) {
+                        p.life -= 0.1;
+                    }
+
+                    if (state.absorber !== 'none') {
+                        if (p.x >= absorberX - 5 && p.x <= absorberX + 5) { 
+                             let blocked = false;
+                             if (state.sourceType === 'Am-241') blocked = true;
+                             if (state.sourceType === 'Sr-90' && state.absorber !== 'paper') blocked = true;
+                             if (state.sourceType === 'Co-60' && state.absorber.startsWith('lead')) {
+                                 if (Math.random() > 0.3) blocked = true; 
+                             }
+
+                             if (blocked) {
+                                 p.life = 0;
+                                 simCtx.fillStyle = '#fff';
+                                 simCtx.fillRect(p.x, p.y, 2, 2);
+                             }
+                        }
+                    }
+
+                    if (p.x >= tubeX && p.x <= tubeX + 10 && p.y > centerY - 15 && p.y < centerY + 15) {
+                        p.life = 0; 
+                        simCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        simCtx.fillRect(tubeX, centerY - 15, 5, 30);
+                    }
+                } else if (p.type === 'hit') {
+                    simCtx.fillStyle = p.color;
+                    simCtx.globalAlpha = Math.max(0, p.life);
+                    simCtx.beginPath();
+                    simCtx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    simCtx.fill();
+                    simCtx.globalAlpha = 1.0;
+                    if (p.life <= 0) particles.splice(i, 1);
+                    continue; 
+                }
+
+                if (p.type === 'ray') {
+                    simCtx.fillStyle = p.color;
+                    simCtx.globalAlpha = Math.max(0, p.life);
+                    simCtx.beginPath();
+                    simCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    simCtx.fill();
+                    simCtx.globalAlpha = 1.0;
+                }
+
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawGraph() {
+            const t = translations[state.lang];
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            const padding = 40; 
+
+            graphCtx.clearRect(0, 0, w, h);
+            
+            // Grid & Axes
+            graphCtx.strokeStyle = '#e2e8f0';
+            graphCtx.lineWidth = 1;
+            graphCtx.beginPath();
+            
+            // Horizontal lines
+            for(let i=0; i<5; i++) {
+                let y = padding + (h - 2*padding) * (i/4);
+                graphCtx.moveTo(padding, y);
+                graphCtx.lineTo(w, y);
+            }
+            graphCtx.stroke();
+
+            // Y-Axis Labels
+            graphCtx.fillStyle = '#64748b';
+            graphCtx.font = '12px Arial';
+            graphCtx.textAlign = 'right';
+            const yLabel = state.graphMode === 'rate' ? "CPM" : "Count"; 
+            graphCtx.fillText(yLabel, padding - 5, 15);
+            
+            // X-Axis Labels (Time (s))
+            graphCtx.textAlign = 'center';
+            graphCtx.fillText("Time (s)", w / 2, h - 5);
+
+            let maxVal = 0;
+            const isRate = state.graphMode === 'rate';
+            
+            // Calculate scale max from data
+            if (state.dataPoints.length > 0) {
+                state.dataPoints.forEach(p => { 
+                    const val = isRate ? p.cpm : p.total;
+                    if (val > maxVal) maxVal = val; 
+                });
+            }
+            maxVal = Math.max(10, maxVal * 1.2); 
+
+            // Calculate Time Window
+            let minTime, maxTime;
+            if (state.graphMode === 'total') {
+                minTime = 0;
+                maxTime = Math.max(10, state.elapsedTime); 
+            } else {
+                maxTime = state.elapsedTime;
+                minTime = Math.max(0, maxTime - 60); 
+            }
+            
+            // X-Axis Ticks (Every 5 seconds)
+            graphCtx.strokeStyle = '#e2e8f0';
+            graphCtx.fillStyle = '#94a3b8';
+            graphCtx.textAlign = 'center';
+            graphCtx.font = '10px Arial';
+            graphCtx.beginPath();
+            
+            // Start from the first multiple of 5 >= minTime
+            let startTick = Math.ceil(minTime / 5) * 5;
+            for (let t = startTick; t <= maxTime; t += 5) {
+                let x = padding + ((t - minTime) / (maxTime - minTime || 1)) * (w - padding);
+                
+                // Draw Tick Line
+                graphCtx.moveTo(x, padding);
+                graphCtx.lineTo(x, h - padding);
+                
+                // Draw Label
+                graphCtx.fillText(t.toString(), x, h - padding + 12);
+            }
+            graphCtx.stroke();
+
+            // Plot Data Line
+            if (state.dataPoints.length > 1) {
+                graphCtx.strokeStyle = '#3b82f6';
+                graphCtx.lineWidth = 2;
+                graphCtx.beginPath();
+
+                let first = true;
+                for (let p of state.dataPoints) {
+                    if (p.time < minTime) continue;
+
+                    const val = isRate ? p.cpm : p.total;
+
+                    let x = padding + ((p.time - minTime) / (maxTime - minTime || 1)) * (w - padding);
+                    let y = (h - padding) - (val / maxVal) * (h - 2*padding);
+
+                    if (first) {
+                        graphCtx.moveTo(x, y);
+                        first = false;
+                    } else {
+                        graphCtx.lineTo(x, y);
+                    }
+                }
+                graphCtx.stroke();
+            }
+
+            // Draw Y Scale Labels (Max, Mid, Zero)
+            graphCtx.textAlign = 'right';
+            graphCtx.textBaseline = 'middle';
+            graphCtx.fillStyle = '#475569';
+            
+            graphCtx.fillText(Math.round(maxVal), padding - 5, padding);
+            graphCtx.fillText(Math.round(maxVal/2), padding - 5, padding + (h-2*padding)/2);
+            graphCtx.fillText("0", padding - 5, h - padding);
+        }
+    </script>
+</body>
+</html>

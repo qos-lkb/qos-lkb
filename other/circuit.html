@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High School Circuit Lab</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg: #ffffff;
+            --accent: #2563eb;
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        /* Sidebar Controls */
+        #controls {
+            width: 260px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        h1 { font-size: 1.2rem; margin: 0 0 10px 0; color: var(--accent); }
+        h2 { font-size: 0.9rem; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+
+        .tool-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        button {
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        button:hover { background-color: #f9fafb; border-color: var(--accent); }
+        button.active { background-color: var(--accent); color: white; border-color: var(--accent); }
+        
+        button.delete-btn { color: #dc2626; border-color: #fecaca; }
+        button.delete-btn.active { background-color: #dc2626; color: white; }
+
+        /* Properties Panel */
+        #properties {
+            margin-top: auto;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+
+        .prop-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        label { font-size: 0.9rem; }
+        input[type="number"] { width: 80px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; }
+
+        /* Canvas Area */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            cursor: crosshair;
+            overflow: hidden;
+        }
+
+        canvas { display: block; background-color: #fff; }
+
+        /* Overlay Instructions */
+        #overlay {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <h1>Circuit Lab</h1>
+        
+        <h2>Tools</h2>
+        <div class="tool-group">
+            <button onclick="setTool('wire')" id="btn-wire" class="active">Wire</button>
+            <button onclick="setTool('resistor')" id="btn-resistor">Resistor</button>
+            <button onclick="setTool('battery')" id="btn-battery">Battery</button>
+            <button onclick="setTool('switch')" id="btn-switch">Switch</button>
+            <button onclick="setTool('ammeter')" id="btn-ammeter">Ammeter</button>
+            <button onclick="setTool('voltmeter')" id="btn-voltmeter">Voltmeter</button>
+            <button onclick="setTool('delete')" id="btn-delete" class="delete-btn">Delete</button>
+            <button onclick="clearCircuit()">Clear All</button>
+        </div>
+
+        <div id="properties" style="display:none;">
+            <h2>Properties</h2>
+            <div id="prop-content"></div>
+        </div>
+
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #666;">
+            <p><strong>Info:</strong><br>
+            Ammeters are ideal (0&Omega;).<br>
+            Voltmeters are ideal (&infin;&Omega;).<br>
+            Ground is auto-set to the negative terminal of the first battery.</p>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="overlay">Drag between grid dots to place components</div>
+        <canvas id="circuitCanvas"></canvas>
+    </div>
+
+<script>
+/**
+ * CIRCUIT SIMULATOR ENGINE
+ * Uses Modified Nodal Analysis (MNA) to solve for voltages and currents.
+ */
+
+const GRID_SIZE = 40;
+const POINT_RADIUS = 3;
+
+// Application State
+let components = [];
+let currentTool = 'wire';
+let selectedComponent = null;
+let isDragging = false;
+let dragStart = null;
+let mousePos = {x:0, y:0};
+
+const canvas = document.getElementById('circuitCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- Component Classes ---
+
+class Component {
+    constructor(type, x1, y1, x2, y2) {
+        this.id = Math.random().toString(36).substr(2, 9);
+        this.type = type;
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+        this.value = 0; // Ohms or Volts
+        this.label = ''; 
+        
+        // Simulation results
+        this.current = 0;
+        this.voltageDrop = 0; // V1 - V2
+
+        // Defaults
+        if(type === 'resistor') this.value = 10; // 10 Ohms
+        if(type === 'battery') this.value = 9;   // 9 Volts
+        if(type === 'switch') this.isOpen = true;
+    }
+
+    getCenter() {
+        return { x: (this.x1 + this.x2)/2, y: (this.y1 + this.y2)/2 };
+    }
+
+    getLength() {
+        return Math.hypot(this.x2 - this.x1, this.y2 - this.y1);
+    }
+}
+
+// --- Interaction Logic ---
+
+function resize() {
+    canvas.width = document.getElementById('canvas-container').clientWidth;
+    canvas.height = document.getElementById('canvas-container').clientHeight;
+    draw();
+}
+window.addEventListener('resize', resize);
+
+function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${tool}`)?.classList.add('active');
+    selectedComponent = null;
+    updatePropertiesPanel();
+    draw();
+}
+
+function getGridPoint(x, y) {
+    return {
+        x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+        y: Math.round(y / GRID_SIZE) * GRID_SIZE
+    };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Check if clicking a component
+    const clickedComp = getComponentAt(x, y);
+
+    if (currentTool === 'delete') {
+        if (clickedComp) {
+            components = components.filter(c => c !== clickedComp);
+            solveCircuit();
+            draw();
+        }
+        return;
+    }
+
+    // Toggle switch logic
+    if (clickedComp && clickedComp.type === 'switch' && !isDragging) {
+        clickedComp.isOpen = !clickedComp.isOpen;
+        solveCircuit();
+        draw();
+        return;
+    }
+
+    // Select component
+    if (clickedComp) {
+        selectedComponent = clickedComp;
+        updatePropertiesPanel();
+        draw();
+        return; // Don't start drawing a new line if we clicked a component
+    } else {
+        selectedComponent = null;
+        updatePropertiesPanel();
+    }
+
+    // Start drawing
+    isDragging = true;
+    dragStart = getGridPoint(x, y);
+    mousePos = {x, y};
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mousePos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+    draw();
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+
+    const start = dragStart;
+    const end = getGridPoint(mousePos.x, mousePos.y);
+
+    if (start.x === end.x && start.y === end.y) {
+        draw();
+        return; // Prevent zero-length components
+    }
+
+    // Check if component already exists here
+    const existing = components.find(c => 
+        (c.x1 === start.x && c.y1 === start.y && c.x2 === end.x && c.y2 === end.y) ||
+        (c.x1 === end.x && c.y1 === end.y && c.x2 === start.x && c.y2 === start.y)
+    );
+
+    if (!existing) {
+        const comp = new Component(currentTool, start.x, start.y, end.x, end.y);
+        components.push(comp);
+        solveCircuit();
+    }
+    
+    draw();
+});
+
+function getComponentAt(x, y) {
+    // Basic hit detection: distance to line segment
+    for (const c of components) {
+        const dist = distToSegment({x,y}, {x:c.x1, y:c.y1}, {x:c.x2, y:c.y2});
+        if (dist < 10) return c;
+    }
+    return null;
+}
+
+function distToSegment(p, v, w) {
+    const l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
+    if (l2 == 0) return Math.hypot(p.x - v.x, p.y - v.y);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+}
+
+function clearCircuit() {
+    components = [];
+    selectedComponent = null;
+    updatePropertiesPanel();
+    draw();
+}
+
+// --- Properties UI ---
+
+function updatePropertiesPanel() {
+    const panel = document.getElementById('properties');
+    const content = document.getElementById('prop-content');
+    content.innerHTML = '';
+
+    if (!selectedComponent) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+    
+    let html = `<div><strong>Type:</strong> ${selectedComponent.type.toUpperCase()}</div>`;
+
+    if (selectedComponent.type === 'resistor') {
+        html += `<div class="prop-row"><label>Resistance (&Omega;)</label> 
+                 <input type="number" value="${selectedComponent.value}" onchange="updateValue(this.value)"></div>`;
+    }
+    if (selectedComponent.type === 'battery') {
+        html += `<div class="prop-row"><label>Voltage (V)</label> 
+                 <input type="number" value="${selectedComponent.value}" onchange="updateValue(this.value)"></div>`;
+    }
+    
+    // Live Stats
+    if (['resistor', 'battery', 'wire', 'switch', 'ammeter'].includes(selectedComponent.type)) {
+         html += `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc">
+                    <div>Current: <strong>${formatNum(selectedComponent.current)} A</strong></div>
+                    <div>Voltage Drop: <strong>${formatNum(selectedComponent.voltageDrop)} V</strong></div>
+                  </div>`;
+    }
+    
+    if (selectedComponent.type === 'voltmeter') {
+         html += `<div style="margin-top:10px; font-weight:bold; color:var(--accent)">
+                    Reading: ${formatNum(selectedComponent.voltageDrop)} V
+                  </div>`;
+    }
+
+    content.innerHTML = html;
+}
+
+function updateValue(val) {
+    if (selectedComponent) {
+        selectedComponent.value = parseFloat(val);
+        solveCircuit();
+        draw();
+        updatePropertiesPanel(); // Refresh stats
+    }
+}
+
+function formatNum(n) {
+    if (Math.abs(n) < 1e-6) return "0.00";
+    if (Math.abs(n) < 0.01) return (n * 1000).toFixed(1) + " m";
+    return n.toFixed(2);
+}
+
+// --- RENDERING ---
+
+function draw() {
+    // Clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Grid
+    ctx.fillStyle = '#ccc';
+    for (let x = GRID_SIZE; x < canvas.width; x += GRID_SIZE) {
+        for (let y = GRID_SIZE; y < canvas.height; y += GRID_SIZE) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Draw Components
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    components.forEach(c => {
+        const isSelected = (c === selectedComponent);
+        drawComponent(c, isSelected);
+    });
+
+    // Draw Ghost component while dragging
+    if (isDragging) {
+        const snap = getGridPoint(mousePos.x, mousePos.y);
+        ctx.strokeStyle = 'rgba(37, 99, 235, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(dragStart.x, dragStart.y);
+        ctx.lineTo(snap.x, snap.y);
+        ctx.stroke();
+    }
+}
+
+function drawComponent(c, selected) {
+    ctx.save();
+    
+    // Color
+    ctx.strokeStyle = selected ? '#2563eb' : '#000';
+    ctx.lineWidth = selected ? 3 : 2;
+    if (c.type === 'wire') ctx.strokeStyle = selected ? '#2563eb' : '#444';
+    if (c.type === 'voltmeter') ctx.strokeStyle = '#059669'; // Greenish
+
+    const dx = c.x2 - c.x1;
+    const dy = c.y2 - c.y1;
+    const len = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const midX = (c.x1 + c.x2) / 2;
+    const midY = (c.y1 + c.y2) / 2;
+
+    ctx.translate(c.x1, c.y1);
+    ctx.rotate(angle);
+
+    // Draw Wire parts leading to component center
+    const gap = 15; // Space for symbol
+    
+    if (c.type === 'wire') {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(len, 0);
+        ctx.stroke();
+    } 
+    else {
+        // Leads
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(len/2 - gap, 0);
+        ctx.moveTo(len/2 + gap, 0);
+        ctx.lineTo(len, 0);
+        ctx.stroke();
+
+        // Symbol
+        ctx.translate(len/2, 0);
+        
+        if (c.type === 'resistor') {
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.lineTo(-7, -6);
+            ctx.lineTo(-3, 6);
+            ctx.lineTo(3, -6);
+            ctx.lineTo(7, 6);
+            ctx.lineTo(10, 0);
+            ctx.stroke();
+        } 
+        else if (c.type === 'battery') {
+            ctx.beginPath();
+            // Long bar (+)
+            ctx.moveTo(5, -10);
+            ctx.lineTo(5, 10);
+            // Short bar (-)
+            ctx.lineWidth = selected ? 4 : 3;
+            ctx.moveTo(-5, -6);
+            ctx.lineTo(-5, 6);
+            ctx.stroke();
+            
+            // Labels
+            ctx.restore(); // reset transform for text
+            ctx.save();
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "#666";
+            ctx.fillText(`${c.value}V`, midX - 10, midY - 15);
+        }
+        else if (c.type === 'switch') {
+            ctx.beginPath();
+            ctx.arc(-10, 0, 2, 0, Math.PI*2); // Left post
+            ctx.fill();
+            ctx.moveTo(-10, 0);
+            if (c.isOpen) {
+                ctx.lineTo(8, -8); // Open arm
+            } else {
+                ctx.lineTo(10, 0); // Closed
+            }
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(10, 0, 2, 0, Math.PI*2); // Right post
+            ctx.fill();
+        }
+        else if (c.type === 'ammeter' || c.type === 'voltmeter') {
+            ctx.beginPath();
+            ctx.fillStyle = '#fff';
+            ctx.arc(0, 0, 12, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Un-rotate text
+            ctx.rotate(-angle);
+            ctx.fillStyle = c.type === 'voltmeter' ? '#059669' : '#000';
+            ctx.font = "bold 14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(c.type === 'ammeter' ? 'A' : 'V', 0, 0);
+
+            // Show reading if simulating
+            if(Math.abs(c.current) > 1e-8 || Math.abs(c.voltageDrop) > 1e-8) {
+                ctx.font = "10px sans-serif";
+                let val = c.type === 'ammeter' ? formatNum(c.current) + 'A' : formatNum(c.voltageDrop) + 'V';
+                ctx.fillStyle = "#000";
+                ctx.fillText(val, 0, 18);
+            }
+        }
+    }
+
+    ctx.restore();
+}
+
+// --- SOLVER (Modified Nodal Analysis) ---
+
+function solveCircuit() {
+    // 1. Identify Nodes
+    const nodes = [];
+    const nodeMap = {}; // "x,y" -> nodeIndex
+    
+    function getNodeIndex(x, y) {
+        const key = `${x},${y}`;
+        if (nodeMap[key] === undefined) {
+            nodeMap[key] = nodes.length;
+            nodes.push({x, y});
+        }
+        return nodeMap[key];
+    }
+
+    // Map components to nodes
+    const netlist = components.map(c => {
+        return {
+            component: c,
+            n1: getNodeIndex(c.x1, c.y1),
+            n2: getNodeIndex(c.x2, c.y2)
+        };
+    });
+
+    const numNodes = nodes.length;
+    if (numNodes < 2) return; // Nothing to solve
+
+    // 2. Identify Voltage Sources (Batteries) for MNA
+    // Also treat Wire, Switch(Closed), Ammeter as 0V voltage sources OR very small resistors.
+    // For stability and simplicity in this specific JS implementation, we will treat:
+    // Wires/Ammeters/ClosedSwitches as very small resistors (1e-5 Ohm).
+    // Batteries as MNA constraints.
+    
+    const voltageSources = netlist.filter(item => item.component.type === 'battery');
+    const m = voltageSources.length;
+    const size = numNodes + m;
+
+    // Initialize Matrix G (size x size) and Vector I (size)
+    const G = Array(size).fill(0).map(() => Array(size).fill(0));
+    const I = Array(size).fill(0);
+
+    // Helper to add conductance
+    function addConductance(n1, n2, g) {
+        G[n1][n1] += g;
+        G[n2][n2] += g;
+        G[n1][n2] -= g;
+        G[n2][n1] -= g;
+    }
+
+    // 3. Fill Matrix
+    netlist.forEach(item => {
+        const { component, n1, n2 } = item;
+        let conductance = 0;
+
+        if (component.type === 'resistor') {
+            conductance = 1 / (component.value || 1e-9); 
+        } 
+        else if (component.type === 'wire') {
+            conductance = 1 / 0.0001; 
+        }
+        else if (component.type === 'ammeter') {
+            conductance = 1 / 0.0001;
+        }
+        else if (component.type === 'switch') {
+            conductance = component.isOpen ? 1e-12 : 1 / 0.0001;
+        }
+        else if (component.type === 'voltmeter') {
+            conductance = 1e-9; // High resistance
+        }
+
+        if (component.type !== 'battery') {
+            addConductance(n1, n2, conductance);
+        }
+    });
+
+    // Handle Batteries (MNA voltage source stamps)
+    voltageSources.forEach((item, index) => {
+        const { component, n1, n2 } = item;
+        const sourceIndex = numNodes + index;
+        
+        // Equation: Vn1 - Vn2 = V_source
+        // In MNA matrix: 
+        // Row for node 1: +Current
+        // Row for node 2: -Current
+        // Row for source: Vn1 - Vn2 = V
+        
+        G[n1][sourceIndex] = 1;
+        G[n2][sourceIndex] = -1;
+        G[sourceIndex][n1] = 1;
+        G[sourceIndex][n2] = -1;
+        
+        I[sourceIndex] = component.value;
+    });
+
+    // 4. Ground Reference
+    // We must ground one node to solve.
+    // Heuristic: Find the negative terminal of the first battery, or just node 0.
+    let groundNode = 0;
+    if(voltageSources.length > 0) {
+        // Convention: Battery points from x1 to x2? Actually we drew line.
+        // Let's assume standard draw direction implies polarity or just ground node 0.
+        // To keep it robust, we just ground node 0.
+    }
+    
+    // Apply Ground constraint to Node 0: V0 = 0
+    // We replace the equation for node 0 with "1 * V0 = 0"
+    for(let j=0; j<size; j++) G[groundNode][j] = 0;
+    G[groundNode][groundNode] = 1;
+    I[groundNode] = 0;
+
+    // 5. Gaussian Elimination
+    const x = gaussianElimination(G, I);
+
+    // 6. Map results back to components
+    if (x) {
+        netlist.forEach(item => {
+            const v1 = x[item.n1];
+            const v2 = x[item.n2];
+            item.component.voltageDrop = v1 - v2;
+            
+            // Calculate Current
+            if (item.component.type === 'battery') {
+                // Current was solved in the extra rows of the matrix
+                // Find which voltage source index this is
+                const vsIdx = voltageSources.indexOf(item);
+                if(vsIdx !== -1) {
+                    item.component.current = x[numNodes + vsIdx];
+                }
+            } else if (item.component.type === 'switch' && item.component.isOpen) {
+                item.component.current = 0;
+            } else if (item.component.type === 'voltmeter') {
+                item.component.current = 0;
+            } else {
+                // I = V/R
+                let r = 0;
+                if(item.component.type === 'resistor') r = item.component.value;
+                else if(item.component.type === 'wire' || item.component.type === 'ammeter') r = 0.0001;
+                else if(item.component.type === 'switch') r = 0.0001;
+                
+                item.component.current = (v1 - v2) / r;
+            }
+        });
+        
+        // Force UI update for sidebar
+        if(selectedComponent) updatePropertiesPanel();
+    }
+}
+
+// Simple Gaussian Elimination Solver
+function gaussianElimination(A, b) {
+    const n = A.length;
+    for (let i = 0; i < n; i++) {
+        // Pivot
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+            if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+        }
+        
+        // Swap
+        [A[i], A[maxRow]] = [A[maxRow], A[i]];
+        [b[i], b[maxRow]] = [b[maxRow], b[i]];
+
+        if (Math.abs(A[i][i]) < 1e-10) return null; // Singular
+
+        // Eliminate
+        for (let k = i + 1; k < n; k++) {
+            const factor = A[k][i] / A[i][i];
+            b[k] -= factor * b[i];
+            for (let j = i; j < n; j++) {
+                A[k][j] -= factor * A[i][j];
+            }
+        }
+    }
+
+    // Back Substitution
+    const x = new Array(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+        let sum = 0;
+        for (let j = i + 1; j < n; j++) {
+            sum += A[i][j] * x[j];
+        }
+        x[i] = (b[i] - sum) / A[i][i];
+    }
+    return x;
+}
+
+// Start
+resize();
+</script>
+</body>
+</html>

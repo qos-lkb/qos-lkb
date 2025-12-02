@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar Evolution + Physics Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+        
+        body {
+            font-family: 'Space Mono', monospace;
+            background-color: #050505;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        canvas { touch-action: none; }
+
+        /* Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #4ade80;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+
+        /* Physics Bars */
+        .force-bar-container {
+            height: 8px;
+            background: #1f2937;
+            border-radius: 3px;
+            overflow: hidden;
+            display: flex;
+        }
+        .force-bar-fill {
+            height: 100%;
+            transition: width 0.5s ease-out, background-color 0.5s;
+        }
+        
+        /* Animations */
+        .ai-loading { animation: pulse-purple 2s infinite; }
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(192, 132, 252, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(192, 132, 252, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(192, 132, 252, 0); }
+        }
+        
+        .arrow-down { color: #ef4444; } /* Gravity */
+        .arrow-up { color: #3b82f6; }   /* Pressure */
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row">
+
+    <!-- Left Panel: Controls & Info -->
+    <div class="w-full md:w-1/3 lg:w-1/4 flex flex-col border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm z-10 h-1/2 md:h-full overflow-y-auto">
+        
+        <div class="p-5 border-b border-gray-800">
+            <h1 class="text-xl font-bold text-green-400">Stellar Life</h1>
+            <p class="text-[10px] text-gray-500">Physics & Evolution Simulator</p>
+        </div>
+
+        <div class="p-5 space-y-6">
+            
+            <!-- Mass Control -->
+            <div>
+                <div class="flex justify-between mb-1">
+                    <label class="text-xs font-bold text-white">Initial Mass</label>
+                    <span id="massValueDisplay" class="text-xs text-blue-400">1.0 M☉</span>
+                </div>
+                <input type="range" id="massSlider" min="0.1" max="40" step="0.1" value="1.0" class="w-full">
+            </div>
+
+            <!-- Time Travel Control -->
+            <div>
+                <div class="flex justify-between mb-1">
+                    <label class="text-xs font-bold text-yellow-400">Timeline Scrubber</label>
+                    <span id="timePercentDisplay" class="text-[10px] text-gray-400">0%</span>
+                </div>
+                <input type="range" id="timeSlider" min="0" max="120" step="0.1" value="0" class="w-full">
+                <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+                    <span>Birth</span>
+                    <span>Main Seq</span>
+                    <span>Death</span>
+                </div>
+            </div>
+
+            <!-- Playback Controls -->
+            <div class="flex space-x-2">
+                <button id="btnReset" class="flex-1 bg-gray-800 hover:bg-gray-700 py-1 rounded text-xs border border-gray-600">RESET</button>
+                <button id="btnPause" class="flex-1 bg-green-900 hover:bg-green-800 py-1 rounded text-xs border border-green-700">PAUSE/PLAY</button>
+            </div>
+
+            <!-- Physics Monitor (Updated) -->
+            <div class="bg-black/40 p-3 rounded border border-gray-700">
+                <h3 class="text-[10px] uppercase tracking-widest text-gray-400 mb-2 border-b border-gray-800 pb-1">Physics Balance</h3>
+                
+                <!-- Gravity -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-[10px] mb-1">
+                        <span>Gravity (Inward)</span>
+                        <span id="gravityText" class="text-red-400">High</span>
+                    </div>
+                    <div class="force-bar-container">
+                        <div id="gravityBar" class="force-bar-fill bg-red-500" style="width: 50%"></div>
+                    </div>
+                </div>
+
+                <!-- Pressure (Split) -->
+                <div class="mb-2">
+                    <div class="flex justify-between text-[10px] mb-1">
+                        <span>Pressure (Outward)</span>
+                        <span id="pressureText" class="text-blue-400">Total: Low</span>
+                    </div>
+                    <!-- Stacked Bar for Thermal vs Radiation -->
+                    <div class="force-bar-container flex">
+                        <div id="pressureBarThermal" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
+                        <div id="pressureBarRadiation" class="h-full bg-purple-500 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[8px] text-gray-500 mt-1">
+                        <span class="text-blue-400">● Thermal Gas</span>
+                        <span class="text-purple-400">● Radiation (T⁴)</span>
+                    </div>
+                </div>
+
+                <!-- Equilibrium Status -->
+                <div id="equilibriumStatus" class="text-[10px] text-center italic text-gray-400 mt-2">
+                    Collapsing...
+                </div>
+            </div>
+
+            <!-- AI Section -->
+            <div class="border-t border-gray-800 pt-3">
+                <label class="text-[10px] uppercase text-purple-400 font-bold mb-2 block">Gemini Intelligence</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnAnalyze" class="bg-purple-900/40 hover:bg-purple-800 border border-purple-800 text-purple-100 py-1 rounded text-[10px]">Analyze Phase ✨</button>
+                    <button id="btnHabitability" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-800 text-blue-100 py-1 rounded text-[10px]">Habitability ✨</button>
+                </div>
+                <div id="aiOutput" class="mt-2 p-2 bg-gray-950 rounded border border-purple-500/30 min-h-[60px] text-[10px] text-gray-300 hidden">
+                    <div id="aiContent" class="markdown-prose"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Telemetry -->
+        <div class="flex-1 p-5 border-t border-gray-800 bg-black/30">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <div class="text-[9px] text-gray-500">Phase</div>
+                    <div id="phaseDisplay" class="text-xs font-bold text-yellow-400">Protostar</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-gray-500">Age</div>
+                    <div id="ageDisplay" class="text-xs font-bold">0 Myr</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-gray-500">Temp</div>
+                    <div id="tempDisplay" class="text-xs font-bold text-blue-300">3000 K</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-gray-500">Radius</div>
+                    <div id="radiusDisplay" class="text-xs font-bold">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Canvas -->
+    <div class="relative w-full md:w-2/3 lg:w-3/4 h-1/2 md:h-full bg-black">
+        <canvas id="simCanvas" class="w-full h-full block"></canvas>
+        <div id="eventOverlay" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none opacity-0 transition-opacity duration-1000">
+            <h2 id="eventTitle" class="text-5xl font-bold text-white tracking-tighter drop-shadow-lg mix-blend-screen">EVENT</h2>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Configuration & State
+         */
+        const apiKey = ""; // API Key injected by environment
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const SOLAR_LIFETIME = 10000; // 10 billion years (in Myr units)
+
+        let simState = {
+            initialMass: 1.0,
+            currentMass: 1.0,
+            age: 0,
+            maxAge: 0,
+            stage: 'protostar',
+            speed: 1,
+            paused: false,
+            particles: [],
+            starsBG: [],
+            // Physics Props
+            radius: 20,
+            temperature: 3000,
+            color: { r: 255, g: 200, b: 100 },
+            gravity: 0.5, // 0-1 scale
+            pressureThermal: 0.0, 
+            pressureRadiation: 0.0,
+            equilibrium: 'Collapsing'
+        };
+
+        const ui = {
+            massSlider: document.getElementById('massSlider'),
+            massDisplay: document.getElementById('massValueDisplay'),
+            timeSlider: document.getElementById('timeSlider'),
+            timeDisplay: document.getElementById('timePercentDisplay'),
+            btnReset: document.getElementById('btnReset'),
+            btnPause: document.getElementById('btnPause'),
+            phase: document.getElementById('phaseDisplay'),
+            age: document.getElementById('ageDisplay'),
+            temp: document.getElementById('tempDisplay'),
+            rad: document.getElementById('radiusDisplay'),
+            gravityBar: document.getElementById('gravityBar'),
+            pressureBarThermal: document.getElementById('pressureBarThermal'),
+            pressureBarRadiation: document.getElementById('pressureBarRadiation'),
+            pressureText: document.getElementById('pressureText'),
+            eqStatus: document.getElementById('equilibriumStatus'),
+            eventOverlay: document.getElementById('eventOverlay'),
+            eventTitle: document.getElementById('eventTitle'),
+            aiOutput: document.getElementById('aiOutput'),
+            aiContent: document.getElementById('aiContent')
+        };
+
+        /* --- Gemini API --- */
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            ui.aiOutput.classList.remove('hidden');
+            ui.aiOutput.classList.add('ai-loading');
+            ui.aiContent.innerHTML = 'Analyzing physics data...';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Signal lost.";
+                ui.aiContent.innerHTML = marked.parse(text);
+            } catch (e) {
+                ui.aiContent.innerText = "Error contacting AI.";
+            } finally {
+                ui.aiOutput.classList.remove('ai-loading');
+            }
+        }
+
+        document.getElementById('btnAnalyze').addEventListener('click', () => {
+            if (!simState.paused) togglePause();
+            const totalP = simState.pressureThermal + simState.pressureRadiation;
+            const radRatio = totalP > 0 ? Math.round((simState.pressureRadiation / totalP) * 100) : 0;
+            
+            const prompt = `As an astrophysicist, explain the internal physics of a ${simState.initialMass} Solar Mass star at the ${simState.stage} phase.
+            Current Stats:
+            - Gravity: ${(simState.gravity*100).toFixed(0)}%
+            - Thermal Pressure: ${(simState.pressureThermal*100).toFixed(0)}%
+            - Radiation Pressure: ${(simState.pressureRadiation*100).toFixed(0)}%
+            
+            Explain the role of Radiation Pressure (approx ${radRatio}% of support) here. Max 50 words.`;
+            callGemini(prompt);
+        });
+
+        document.getElementById('btnHabitability').addEventListener('click', () => {
+             if (!simState.paused) togglePause();
+             const prompt = `Assess habitability for a planet 1AU away from this star: Phase: ${simState.stage}, Temp: ${simState.temperature}K, Radius: ${simState.radius.toFixed(0)} relative units. Max 40 words.`;
+             callGemini(prompt);
+        });
+
+
+        /* --- Simulation Logic --- */
+
+        function getLifetime(mass) {
+            // T ~ 1/M^2.5
+            return SOLAR_LIFETIME * Math.pow(mass, -2.5);
+        }
+
+        function initSimulation() {
+            simState.initialMass = parseFloat(ui.massSlider.value);
+            simState.maxAge = getLifetime(simState.initialMass);
+            simState.particles = [];
+            
+            updateFromSlider();
+            
+            ui.eventOverlay.classList.add('opacity-0');
+            ui.aiOutput.classList.add('hidden');
+        }
+
+        function updateFromSlider() {
+            const percent = parseFloat(ui.timeSlider.value); // 0 to 120
+            simState.age = (percent / 100) * simState.maxAge;
+            calculatePhysicsState();
+            updateUI();
+        }
+
+        function calculatePhysicsState() {
+            const mass = simState.initialMass;
+            const progress = simState.age / simState.maxAge; 
+
+            // Default
+            simState.equilibrium = "Stable";
+            
+            // 1. PROTOSTAR (0% - 2% of life)
+            if (progress < 0.02) {
+                simState.stage = 'protostar';
+                simState.radius = 100 - (progress * 5000); 
+                if (simState.radius < 20) simState.radius = 20;
+                
+                simState.color = { r: 200, g: 100, b: 50 };
+                simState.temperature = 2000 + (progress * 100000); 
+
+                simState.gravity = 0.7;
+                // Mostly thermal from heating up
+                simState.pressureThermal = 0.3 + (progress * 10); 
+                simState.pressureRadiation = 0.0;
+                simState.equilibrium = "Gravitational Collapse > Pressure";
+            }
+            // 2. MAIN SEQUENCE (2% - 90%)
+            else if (progress < 0.9) {
+                simState.stage = 'main_sequence';
+                
+                if (mass < 0.8) {
+                    // Red Dwarf: Convective, Thermal
+                    simState.color = { r: 255, g: 100, b: 100 };
+                    simState.radius = 15 * mass; 
+                    simState.temperature = 3500;
+                    simState.gravity = 0.4;
+                    simState.pressureThermal = 0.4;
+                    simState.pressureRadiation = 0.0; 
+                } else if (mass < 8) {
+                    // Sun-like: Radiative Core, Thermal dominant but some Rad
+                    simState.color = { r: 255, g: 255, b: 220 };
+                    simState.radius = 30 * mass;
+                    simState.temperature = 5800;
+                    simState.gravity = 0.5;
+                    simState.pressureThermal = 0.45;
+                    simState.pressureRadiation = 0.05; // Tiny bit
+                } else {
+                    // Massive: CNO Cycle, Radiation Pressure significant
+                    simState.color = { r: 150, g: 180, b: 255 }; 
+                    simState.radius = 40 * mass;
+                    if(simState.radius > 150) simState.radius = 150;
+                    simState.temperature = 30000;
+                    simState.gravity = 0.8;
+                    
+                    // Radiation pressure becomes dominant force against gravity
+                    simState.pressureThermal = 0.3;
+                    simState.pressureRadiation = 0.5; 
+                }
+                simState.equilibrium = "Hydrostatic Equilibrium";
+            }
+            // 3. GIANT PHASE (90% - 100%)
+            else if (progress < 1.0) {
+                simState.stage = mass < 8 ? 'red_giant' : 'red_supergiant';
+                
+                const expansionFactor = mass < 8 ? 3 : 5;
+                simState.radius = (30 * mass) * (1 + ((progress-0.9)*10 * expansionFactor));
+                if (simState.radius > 250) simState.radius = 250; 
+                
+                simState.color = { r: 255, g: 50, b: 50 };
+                simState.temperature = 3000; 
+
+                simState.gravity = 0.8; 
+                // Giant phase driven by shell burning (Radiation Pressure on envelope)
+                simState.pressureThermal = 0.2;
+                simState.pressureRadiation = 0.8; 
+                simState.equilibrium = "Rad Pressure > Gravity (Expansion)";
+            }
+            // 4. REMNANTS (100% +)
+            else {
+                if (mass < 8) {
+                    simState.stage = 'white_dwarf';
+                    simState.radius = 8;
+                    simState.color = { r: 255, g: 255, b: 255 };
+                    simState.temperature = 100000;
+                    
+                    simState.gravity = 0.8;
+                    // Electron Degeneracy (Model as Thermal for simplicity in viz or separate?)
+                    // Let's use Thermal bar for "Degeneracy" as it's particle based, not photon
+                    simState.pressureThermal = 0.8; 
+                    simState.pressureRadiation = 0.0;
+                    simState.equilibrium = "Electron Degeneracy Support";
+                } else if (mass < 20) {
+                    simState.stage = 'neutron_star';
+                    simState.radius = 5;
+                    simState.color = { r: 100, g: 200, b: 255 };
+                    simState.temperature = 1000000;
+                    
+                    simState.gravity = 0.95;
+                    simState.pressureThermal = 0.95; // Neutron Degeneracy
+                    simState.pressureRadiation = 0.0;
+                    simState.equilibrium = "Neutron Degeneracy Support";
+                } else {
+                    simState.stage = 'black_hole';
+                    simState.radius = 15;
+                    simState.color = { r: 0, g: 0, b: 0 };
+                    simState.temperature = 0;
+
+                    simState.gravity = 1.0; 
+                    simState.pressureThermal = 0.0; 
+                    simState.pressureRadiation = 0.0;
+                    simState.equilibrium = "Collapse Complete";
+                }
+            }
+        }
+
+        function updateUI() {
+            ui.massDisplay.innerText = simState.initialMass + " M☉";
+            ui.phase.innerText = simState.stage.replace('_', ' ').toUpperCase();
+            
+            // Time
+            if (simState.age < 1) ui.age.innerText = Math.floor(simState.age * 1000) + " Kyr";
+            else if (simState.age > 1000) ui.age.innerText = (simState.age / 1000).toFixed(2) + " Gyr";
+            else ui.age.innerText = simState.age.toFixed(1) + " Myr";
+
+            ui.timeDisplay.innerText = ui.timeSlider.value + "%";
+
+            // Physics Stats
+            ui.temp.innerText = Math.round(simState.temperature) + " K";
+            ui.rad.innerText = Math.round(simState.radius) + " px (Rel)";
+            
+            // Physics Bars
+            ui.gravityBar.style.width = (simState.gravity * 100) + "%";
+            ui.pressureBarThermal.style.width = (simState.pressureThermal * 100) + "%";
+            ui.pressureBarRadiation.style.width = (simState.pressureRadiation * 100) + "%";
+            
+            ui.eqStatus.innerText = simState.equilibrium;
+            ui.eqStatus.className = simState.equilibrium.includes("Stable") || simState.equilibrium.includes("Equilibrium") || simState.equilibrium.includes("Support")
+                ? "text-[10px] text-center font-bold text-green-400 mt-2" 
+                : "text-[10px] text-center italic text-yellow-400 mt-2";
+        }
+
+        function draw() {
+            // Clear
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            // Background Stars
+            ctx.fillStyle = "#ffffff";
+            simState.starsBG.forEach(s => {
+                ctx.globalAlpha = s.alpha;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Draw Particles (if any)
+            for(let i=simState.particles.length-1; i>=0; i--) {
+                let p = simState.particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if(p.life <=0) { simState.particles.splice(i,1); continue; }
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.random()*3, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Draw Main Star
+            if (simState.stage === 'black_hole') {
+                // Accretion Disk
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(cx, cy, simState.radius*2, 0, Math.PI*2); ctx.stroke();
+                // Hole
+                ctx.fillStyle = 'black';
+                ctx.beginPath(); ctx.arc(cx, cy, simState.radius, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 20; ctx.shadowColor = "purple"; ctx.stroke(); ctx.shadowBlur = 0;
+            } else {
+                // Star Glow
+                const grad = ctx.createRadialGradient(cx, cy, simState.radius*0.2, cx, cy, simState.radius*1.5);
+                grad.addColorStop(0, 'white');
+                grad.addColorStop(0.4, `rgba(${simState.color.r}, ${simState.color.g}, ${simState.color.b}, 1)`);
+                grad.addColorStop(1, `rgba(${simState.color.r}, ${simState.color.g}, ${simState.color.b}, 0)`);
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, simState.radius*1.5, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Draw Physics Arrows (The Visualization of Forces)
+            if (simState.stage !== 'black_hole') {
+                const arrowDist = simState.radius * 1.6 + 20;
+                
+                // Gravity (Inward)
+                const gLen = simState.gravity * 40;
+                ctx.strokeStyle = '#ef4444'; // Red
+                ctx.lineWidth = 2;
+                // Top Arrow
+                drawArrow(cx, cy - arrowDist - gLen, cx, cy - arrowDist);
+                // Bottom Arrow
+                drawArrow(cx, cy + arrowDist + gLen, cx, cy + arrowDist);
+
+                // Thermal Pressure (Outward - Blue)
+                const ptLen = simState.pressureThermal * 40;
+                if (ptLen > 0) {
+                    ctx.strokeStyle = '#3b82f6'; // Blue
+                    drawArrow(cx, cy - simState.radius, cx, cy - simState.radius - ptLen);
+                    drawArrow(cx, cy + simState.radius, cx, cy + simState.radius + ptLen);
+                }
+
+                // Radiation Pressure (Outward - Purple)
+                const prLen = simState.pressureRadiation * 40;
+                if (prLen > 0) {
+                    ctx.strokeStyle = '#a855f7'; // Purple
+                    // Offset slightly if both exist
+                    const offset = ptLen > 0 ? 10 : 0;
+                    drawArrow(cx + offset, cy - simState.radius, cx + offset, cy - simState.radius - prLen);
+                    drawArrow(cx - offset, cy + simState.radius, cx - offset, cy + simState.radius + prLen);
+                }
+            }
+        }
+
+        function drawArrow(x1, y1, x2, y2) {
+            const headlen = 5; 
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+        }
+
+        function triggerExplosion() {
+            for(let i=0; i<100; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 10;
+                simState.particles.push({
+                    x: canvas.width/2, y: canvas.height/2,
+                    vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+                    life: 1.0, color: 'white'
+                });
+            }
+        }
+
+        function loop() {
+            if (!simState.paused) {
+                // Auto-increment slider
+                let currentVal = parseFloat(ui.timeSlider.value);
+                if (currentVal < 120) {
+                    ui.timeSlider.value = (currentVal + (0.1 * simState.speed)).toString();
+                    updateFromSlider();
+                    
+                    // Trigger explosions at exact 100% boundary
+                    if (Math.abs(currentVal - 100) < 0.2 && simState.initialMass > 0.5) {
+                        triggerExplosion();
+                    }
+                }
+            }
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function togglePause() {
+            simState.paused = !simState.paused;
+        }
+
+        /* --- Event Listeners --- */
+        ui.massSlider.addEventListener('input', initSimulation);
+        ui.timeSlider.addEventListener('input', () => {
+            simState.paused = true; // Pause when scrubbing
+            updateFromSlider();
+        });
+        ui.btnPause.addEventListener('click', togglePause);
+        ui.btnReset.addEventListener('click', () => {
+            ui.timeSlider.value = 0;
+            simState.paused = false;
+            initSimulation();
+        });
+
+        function resize() {
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = canvas.parentElement.offsetHeight;
+            simState.starsBG = Array(100).fill().map(() => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 1.5,
+                alpha: Math.random()
+            }));
+        }
+        window.addEventListener('resize', resize);
+        
+        // Init
+        resize();
+        initSimulation();
+        loop();
+
+    </script>
+</body>
+</html>

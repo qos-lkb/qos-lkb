@@ -1,0 +1,528 @@
+<!DOCTYPE html><html lang="en"><head><meta name="x-poe-datastore-behavior" content="local_only"><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vertical Motion &amp; Parachute Simulator</title>
+    <!-- Load Chart.js for graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --bg-color: #f4f4f9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        /* Simulation Area */
+        .sim-panel {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1 1 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas#simCanvas {
+            border: 2px solid #ddd;
+            background: linear-gradient(to bottom, #87CEEB 0%, #e0f7fa 80%, #8d6e63 80%, #5d4037 100%);
+            border-radius: 4px;
+            cursor: crosshair;
+        }
+
+        /* Controls Area */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        input[type="number"], input[type="range"] {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            color: white;
+        }
+
+        #startBtn { background-color: #27ae60; }
+        #startBtn:hover { background-color: #2ecc71; }
+        
+        #resetBtn { background-color: #c0392b; }
+        #resetBtn:hover { background-color: #e74c3c; }
+
+        #parachuteBtn { 
+            background-color: var(--primary-color); 
+            grid-column: span 2;
+            font-size: 1.1em;
+        }
+        #parachuteBtn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        /* Graphs Area */
+        .graphs-panel {
+            flex: 1 1 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .graph-container {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            height: 200px;
+            position: relative;
+        }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85em;
+            margin-top: 5px;
+            justify-content: center;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            canvas#simCanvas { width: 100%; height: auto; }
+        }
+    </style>
+<script src="https://puc.poecdn.net/authenticated_preview_page/syncedState.3f7572448765332f3047.js"></script></head>
+<body>
+
+    <h1>Vertical Motion &amp; Parachute Simulator</h1>
+
+    <div class="container">
+        
+        <!-- Left Side: Simulation & Controls -->
+        <div class="sim-panel">
+            <canvas id="simCanvas" width="400" height="500"></canvas>
+            
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:red;"></div>Gravity (Fg)</div>
+                <div class="legend-item"><div class="dot" style="background:blue;"></div>Air Resistance (Fd)</div>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="initVel">Initial Velocity (m/s)</label>
+                    <input type="number" id="initVel" value="0" min="-100" max="100">
+                    <small>(Positive = Up, Negative = Down)</small>
+                </div>
+                <div class="control-group">
+                    <label for="initHeight">Initial Height (m)</label>
+                    <input type="number" id="initHeight" value="200" min="0" max="500">
+                </div>
+                <div class="control-group">
+                    <label for="dragCoeff">Drag Coeff (Cd)</label>
+                    <input type="number" id="dragCoeff" value="0.47" step="0.01" min="0">
+                    <small>(Sphere ~0.47)</small>
+                </div>
+                <div class="control-group">
+                    <label for="mass">Mass (kg)</label>
+                    <input type="number" id="mass" value="10" min="0.1">
+                </div>
+                
+                <button id="startBtn" onclick="startSimulation()">Start / Resume</button>
+                <button id="resetBtn" onclick="resetSimulation()">Reset</button>
+                <button id="parachuteBtn" onclick="deployParachute()" disabled="">DEPLOY PARACHUTE</button>
+            </div>
+            <div id="status" style="margin-top:10px; font-weight:bold;">Status: Ready</div>
+        </div>
+
+        <!-- Right Side: Graphs -->
+        <div class="graphs-panel">
+            <div class="graph-container">
+                <canvas id="dispChart"></canvas>
+            </div>
+            <div class="graph-container">
+                <canvas id="velChart"></canvas>
+            </div>
+            <div class="graph-container">
+                <canvas id="accChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Physics Constants ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const G = 9.81; // Gravity m/s^2
+        const AIR_DENSITY = 1.225; // kg/m^3
+        const SCALE = 1.5; // Pixels per meter (Visual scaling)
+        const DT = 0.02; // Time step (s)
+        
+        // --- State Variables ---
+        let state = {
+            y: 0,           // Height (m)
+            v: 0,           // Velocity (m/s)
+            a: 0,           // Acceleration (m/s^2)
+            t: 0,           // Time (s)
+            mass: 10,       // kg
+            cd: 0.47,       // Drag Coefficient
+            area: 0.1,      // Cross-sectional area (m^2)
+            parachuteOpen: false,
+            running: false,
+            finished: false,
+            groundY: 0      // Calculated ground pixel position
+        };
+
+        let animationFrame;
+        let chartUpdateCounter = 0;
+
+        // --- Chart.js Instances ---
+        let charts = {};
+
+        function initCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                elements: { point: { radius: 0 } }, // Hide points for performance
+                scales: { x: { title: { display: true, text: 'Time (s)' } } }
+            };
+
+            charts.disp = new Chart(document.getElementById('dispChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Displacement (m)', data: [], borderColor: '#8e44ad', borderWidth: 2 }] },
+                options: commonOptions
+            });
+
+            charts.vel = new Chart(document.getElementById('velChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Velocity (m/s)', data: [], borderColor: '#2980b9', borderWidth: 2 }] },
+                options: commonOptions
+            });
+
+            charts.acc = new Chart(document.getElementById('accChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Acceleration (m/s²)', data: [], borderColor: '#c0392b', borderWidth: 2 }] },
+                options: commonOptions
+            });
+        }
+
+        // --- Physics Engine ---
+        function updatePhysics() {
+            if (!state.running || state.finished) return;
+
+            // 1. Calculate Forces
+            // Gravity: Fg = m * g (Downwards is negative in physics usually, but here y=0 is ground)
+            // Let's define: Positive Y is UP.
+            const F_gravity = -state.mass * G;
+
+            // Drag: Fd = 0.5 * p * v^2 * Cd * A
+            // Direction is opposite to velocity
+            const vSq = state.v * state.v;
+            const dragDir = state.v > 0 ? -1 : 1; // If moving up, drag is down.
+            
+            // Parachute logic: drastically increase Area and Cd
+            let currentCd = state.cd;
+            let currentArea = state.area;
+            
+            if (state.parachuteOpen) {
+                currentCd = 1.75; // Parachute Cd
+                currentArea = 20.0; // Large area
+            }
+
+            const F_drag = 0.5 * AIR_DENSITY * vSq * currentCd * currentArea * dragDir;
+
+            // Net Force
+            const F_net = F_gravity + F_drag;
+
+            // 2. Newton's 2nd Law: a = F/m
+            state.a = F_net / state.mass;
+
+            // 3. Euler Integration
+            state.v += state.a * DT;
+            state.y += state.v * DT;
+            state.t += DT;
+
+            // 4. Collision Detection (Ground)
+            if (state.y <= 0) {
+                state.y = 0;
+                state.v = 0;
+                state.a = 0;
+                state.running = false;
+                state.finished = true;
+                document.getElementById('status').innerText = "Status: Landed";
+                document.getElementById('startBtn').innerText = "Finished";
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('parachuteBtn').disabled = true;
+            }
+
+            // 5. Update Data Arrays
+            // Update charts every 5 frames to save performance
+            chartUpdateCounter++;
+            if (chartUpdateCounter % 5 === 0) {
+                updateCharts();
+            }
+        }
+
+        function updateCharts() {
+            const limit = 100; // Keep last 100 points to avoid memory bloat if running long
+            
+            // Helper to push and shift
+            const addData = (chart, label, data) => {
+                chart.data.labels.push(label.toFixed(1));
+                chart.data.datasets[0].data.push(data);
+                // Optional: Scroll effect
+                // if (chart.data.labels.length > limit) {
+                //     chart.data.labels.shift();
+                //     chart.data.datasets[0].data.shift();
+                // }
+                chart.update();
+            };
+
+            addData(charts.disp, state.t, state.y);
+            addData(charts.vel, state.t, state.v);
+            addData(charts.acc, state.t, state.a);
+        }
+
+        // --- Drawing ---
+        function draw() {
+            // Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Coordinate conversion: Physics Y (0 is ground) to Canvas Y (Height is ground)
+            // We reserve bottom 20% for ground visual
+            const groundPixel = canvas.height * 0.8;
+            
+            // Camera/Scaling logic: Keep object in view if it goes too high
+            // Simple approach: Fixed scale, but if y > view, we shift view? 
+            // For simplicity in this HS demo, we'll use a fixed scale but clamp drawing or scale down.
+            // Let's use a dynamic camera offset if y > 300m
+            
+            let drawY = groundPixel - (state.y * SCALE);
+            
+            // Draw Ground
+            ctx.fillStyle = '#5d4037'; // Dark brown
+            ctx.fillRect(0, groundPixel, canvas.width, canvas.height - groundPixel);
+            ctx.fillStyle = '#8d6e63'; // Light brown top
+            ctx.fillRect(0, groundPixel, canvas.width, 10);
+
+            // Draw Object (Ball)
+            const ballX = canvas.width / 2;
+            const ballRadius = 10;
+
+            // Draw Parachute if open
+            if (state.parachuteOpen) {
+                ctx.beginPath();
+                ctx.arc(ballX, drawY - 25, 30, Math.PI, 0); // Semi-circle
+                ctx.lineTo(ballX, drawY - 5); // Cords
+                ctx.closePath();
+                ctx.fillStyle = '#e67e22';
+                ctx.fill();
+                ctx.strokeStyle = '#d35400';
+                ctx.stroke();
+
+                // Cords
+                ctx.beginPath();
+                ctx.moveTo(ballX - 30, drawY - 25);
+                ctx.lineTo(ballX, drawY);
+                ctx.moveTo(ballX + 30, drawY - 25);
+                ctx.lineTo(ballX, drawY);
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            }
+
+            // Draw Ball
+            ctx.beginPath();
+            ctx.arc(ballX, drawY, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#2c3e50';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw Force Vectors
+            // Gravity (Red, Down)
+            drawArrow(ballX, drawY, 0, 1, Math.abs(state.mass * G) * 2, 'red'); // Scale factor for visibility
+
+            // Drag (Blue, Opposite to velocity)
+            // Calculate magnitude for visual
+            let vSq = state.v * state.v;
+            let currentCd = state.parachuteOpen ? 1.75 : state.cd;
+            let currentArea = state.parachuteOpen ? 20.0 : state.area;
+            let fDragMag = 0.5 * AIR_DENSITY * vSq * currentCd * currentArea;
+            
+            // Cap visual length so it doesn't cover whole screen
+            let visualDrag = Math.min(fDragMag * 2, 100); 
+            
+            if (Math.abs(state.v) > 0.1) {
+                let dirY = state.v > 0 ? 1 : -1; // If moving up, draw arrow down. If moving down, draw arrow up.
+                drawArrow(ballX, drawY - (dirY * ballRadius), 0, dirY, visualDrag, 'blue');
+            }
+            
+            // Text Info on Canvas
+            ctx.fillStyle = 'black';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Height: ${state.y.toFixed(1)} m`, 10, 20);
+            ctx.fillText(`Velocity: ${state.v.toFixed(1)} m/s`, 10, 40);
+            ctx.fillText(`Time: ${state.t.toFixed(1)} s`, 10, 60);
+        }
+
+        function drawArrow(x, y, dx, dy, length, color) {
+            if (length < 2) return; // Don't draw tiny arrows
+
+            const headlen = 10; // length of head in pixels
+            const angle = Math.atan2(dy, dx);
+            
+            // End point
+            const ex = x + dx * 0; // Vertical motion only, dx is 0
+            const ey = y + dy * length;
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.moveTo(x, y);
+            ctx.lineTo(ex, ey);
+            ctx.stroke();
+
+            // Arrowhead
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(ex, ey);
+            ctx.lineTo(ex - headlen * Math.cos(angle - Math.PI / 6), ey - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(ex - headlen * Math.cos(angle + Math.PI / 6), ey - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+        }
+
+        // --- Main Loop ---
+        function loop() {
+            updatePhysics();
+            draw();
+            animationFrame = requestAnimationFrame(loop);
+        }
+
+        // --- Interaction Functions ---
+        function startSimulation() {
+            if (state.finished) return;
+            
+            if (!state.running) {
+                // Starting fresh or resuming
+                state.running = true;
+                document.getElementById('status').innerText = "Status: Running";
+                document.getElementById('startBtn').innerText = "Pause";
+                document.getElementById('parachuteBtn').disabled = false;
+                
+                // Read inputs if t=0
+                if (state.t === 0) {
+                    state.v = parseFloat(document.getElementById('initVel').value);
+                    state.y = parseFloat(document.getElementById('initHeight').value);
+                    state.mass = parseFloat(document.getElementById('mass').value);
+                    state.cd = parseFloat(document.getElementById('dragCoeff').value);
+                }
+            } else {
+                // Pausing
+                state.running = false;
+                document.getElementById('status').innerText = "Status: Paused";
+                document.getElementById('startBtn').innerText = "Resume";
+            }
+        }
+
+        function resetSimulation() {
+            state.running = false;
+            state.finished = false;
+            state.t = 0;
+            state.parachuteOpen = false;
+            state.y = parseFloat(document.getElementById('initHeight').value);
+            state.v = parseFloat(document.getElementById('initVel').value);
+            state.a = 0;
+            
+            // Reset UI
+            document.getElementById('status').innerText = "Status: Ready";
+            document.getElementById('startBtn').innerText = "Start";
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('parachuteBtn').disabled = true;
+            document.getElementById('parachuteBtn').innerText = "DEPLOY PARACHUTE";
+            document.getElementById('parachuteBtn').style.backgroundColor = "";
+
+            // Clear Graphs
+            charts.disp.data.labels = [];
+            charts.disp.data.datasets[0].data = [];
+            charts.disp.update();
+
+            charts.vel.data.labels = [];
+            charts.vel.data.datasets[0].data = [];
+            charts.vel.update();
+
+            charts.acc.data.labels = [];
+            charts.acc.data.datasets[0].data = [];
+            charts.acc.update();
+
+            draw(); // Draw initial state
+        }
+
+        function deployParachute() {
+            if (!state.finished) {
+                state.parachuteOpen = true;
+                document.getElementById('parachuteBtn').innerText = "PARACHUTE DEPLOYED";
+                document.getElementById('parachuteBtn').style.backgroundColor = "#27ae60";
+                document.getElementById('parachuteBtn').disabled = true;
+            }
+        }
+
+        // --- Initialization ---
+        window.onload = function() {
+            initCharts();
+            resetSimulation(); // Set initial values
+            loop(); // Start render loop (physics only updates if running=true)
+        };
+
+    </script>
+
+
+</body></html>

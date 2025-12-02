@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>物理實驗室：繞射光柵模擬</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- MathJax -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
         /* Custom slider styling */
         input[type=range] {
             -webkit-appearance: none; 
-            background: transparent; 
+            /* background: transparent; Removed to ensure visibility with Tailwind classes */
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -19,26 +23,46 @@
             outline: none; 
         }
         
-        /* Neon Text Effect */
-        .neon-text {
-            text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
-        }
-        
         /* Canvas Glow */
         .screen-glow {
             box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* Modal Transition */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        body.modal-active {
+            overflow-y: hidden;
+        }
+        
+        /* Switch Animation */
+        .switch-pill {
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
         }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col">
 
     <!-- Header -->
-    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-lg">
-        <div class="max-w-6xl mx-auto flex items-center gap-3">
-            <i class="fas fa-microscope text-2xl text-blue-400"></i>
-            <div>
-                <h1 class="text-xl font-bold tracking-wider">物理實驗室：繞射光柵 (Diffraction Grating)</h1>
-                <p class="text-xs text-gray-400">公式驗證：d sin θ = n λ</p>
+    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-lg sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-microscope text-2xl text-blue-400"></i>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold tracking-wider" id="txt-title">物理實驗室：繞射光柵 (Diffraction Grating)</h1>
+                    <p class="text-xs text-gray-400"><span id="txt-subtitle">公式驗證</span>：\( d \sin \theta = n \lambda \)</p>
+                </div>
+            </div>
+            
+            <!-- Top Right Buttons -->
+            <div class="flex gap-2">
+                <button id="theory-btn" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-semibold shadow-lg transition-colors flex items-center gap-2">
+                    <i class="fas fa-book-open"></i> <span id="txt-theory-btn">原理</span>
+                </button>
+                <button id="lang-btn" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded text-sm font-mono text-gray-300 transition-colors">
+                    中 / EN
+                </button>
             </div>
         </div>
     </header>
@@ -48,16 +72,35 @@
         
         <!-- Controls Section -->
         <div class="lg:col-span-1 space-y-6 bg-gray-800 p-6 rounded-xl shadow-xl h-fit">
-            <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-3 mb-4">實驗參數設定</h2>
+            <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-3 mb-4" id="txt-params">實驗參數設定</h2>
 
-            <!-- Wavelength Control -->
-            <div class="space-y-2">
+            <!-- Light Source Control (Redesigned) -->
+            <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                <span class="text-sm font-medium text-gray-300" id="txt-source">光源類型</span>
+                
+                <!-- New Segmented Control Switch -->
+                <div class="relative w-40 h-8 bg-gray-700 rounded-lg p-1 flex select-none cursor-pointer" id="switch-container">
+                    <!-- Sliding Pill Background -->
+                    <div id="switch-pill" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-blue-600 rounded-md shadow-sm switch-pill z-0 translate-x-full"></div>
+                    
+                    <!-- Buttons -->
+                    <div id="btn-white" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-gray-400 transition-colors">
+                        <span id="label-white">白光</span>
+                    </div>
+                    <div id="btn-mono" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-white transition-colors">
+                        <span id="label-monochrome">單色光</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wavelength Control (Disabled for White Light) -->
+            <div id="wavelength-control" class="space-y-2 transition-opacity duration-300">
                 <div class="flex justify-between items-center">
-                    <label class="text-sm font-medium text-gray-300">激光波長 ($\lambda$)</label>
+                    <label class="text-sm font-medium text-gray-300"><span id="txt-wavelength">激光波長</span> (\(\lambda\))</label>
                     <span id="lambda-display" class="font-mono font-bold text-blue-400 bg-gray-900 px-2 py-1 rounded">532 nm</span>
                 </div>
                 <input type="range" id="lambda-slider" min="380" max="750" value="532" step="1" 
-                    class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-color">
+                    class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-color transition-all">
                 
                 <!-- Color Spectrum Bar -->
                 <div class="w-full h-3 rounded bg-gradient-to-r from-purple-600 via-blue-500 via-green-500 via-yellow-400 via-orange-500 to-red-600 opacity-80"></div>
@@ -66,23 +109,24 @@
             <!-- Grating Density Control -->
             <div class="space-y-2 pt-4 border-t border-gray-700">
                 <div class="flex justify-between items-center">
-                    <label class="text-sm font-medium text-gray-300">光柵線密度 ($N$)</label>
+                    <label class="text-sm font-medium text-gray-300"><span id="txt-density">光柵線密度</span> (\(N\))</label>
                     <span id="lines-display" class="font-mono font-bold text-gray-100 bg-gray-900 px-2 py-1 rounded">500 lines/mm</span>
                 </div>
+                <!-- Updated Slider Class for Visibility -->
                 <input type="range" id="lines-slider" min="100" max="1200" value="500" step="50" 
-                    class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white">
-                <p class="text-xs text-gray-400 mt-1">
-                    光柵間距 $d$ = <span id="d-value" class="text-yellow-400">2.00</span> $\mu m$
-                </p>
-            </div>
-
-            <!-- Theory Box -->
-            <div class="bg-gray-900/50 p-4 rounded border border-gray-700 mt-6">
-                <h3 class="text-sm font-bold text-gray-300 mb-2"><i class="fas fa-book-open mr-2"></i>原理提示</h3>
-                <p class="text-xs text-gray-400 leading-relaxed">
-                    光通過狹縫時會發生繞射。當波長 $\lambda$ 增加，或光柵間距 $d$ 減少（線密度增加）時，繞射角度 $\theta$ 會變大。<br>
-                    <span class="block mt-2 text-center font-serif italic text-lg text-blue-200">d sin $\theta$ = n $\lambda$</span>
-                </p>
+                    class="w-full h-2 bg-gray-600 border border-gray-500 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white">
+                
+                <!-- Calculation Display -->
+                <div class="mt-2 text-xs text-gray-400 bg-gray-900/40 p-2 rounded border border-gray-700/50">
+                    <div class="flex justify-between items-center mb-1">
+                        <span id="txt-calc-method" class="text-gray-500">計算方法:</span>
+                        <span class="font-mono text-gray-300">\( d = \frac{1}{N} \text{ mm} \)</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span><span id="txt-spacing">光柵間距</span> \(d\):</span>
+                        <span class="font-mono text-yellow-400"><span id="d-value">2.00</span> \(\mu m\)</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -92,14 +136,14 @@
             <!-- Visual Simulation -->
             <div class="bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-700 relative">
                 <div class="absolute top-3 left-3 z-10 bg-gray-900/80 px-3 py-1 rounded text-xs text-gray-300 border border-gray-600">
-                    模擬屏幕視角 (Screen View)
+                    <span id="txt-screen-view">模擬屏幕視角</span>
                 </div>
                 <canvas id="diffraction-canvas" class="w-full h-64 screen-glow"></canvas>
                 <!-- Screen Ruler (Visual Aid) -->
                 <div class="absolute bottom-0 w-full flex justify-between px-4 text-[10px] text-gray-500 pb-1 select-none font-mono">
                     <span>-90°</span>
                     <span>-45°</span>
-                    <span>0° (中央亮紋)</span>
+                    <span id="txt-center-spot">0° (中央亮紋)</span>
                     <span>+45°</span>
                     <span>+90°</span>
                 </div>
@@ -108,31 +152,164 @@
             <!-- Data Table -->
             <div class="bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex-grow">
                 <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center">
-                    <h3 class="font-semibold text-gray-200"><i class="fas fa-table mr-2"></i>測量數據</h3>
-                    <span class="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded">最大級數 ($n_{max}$): <span id="max-order"></span></span>
+                    <h3 class="font-semibold text-gray-200"><i class="fas fa-table mr-2"></i><span id="txt-data">測量數據</span></h3>
+                    <span id="max-order-container" class="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded transition-opacity"><span id="txt-max-order">最大級數</span> (\(n_{max}\)): <span id="max-order"></span></span>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto relative">
                     <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
-                            <tr>
-                                <th class="px-6 py-3">級數 ($n$)</th>
-                                <th class="px-6 py-3">計算公式 ($\sin \theta$)</th>
-                                <th class="px-6 py-3 text-right">繞射角 ($\theta$)</th>
+                        <thead class="text-xs text-gray-400 bg-gray-900/50">
+                            <!-- Headers will be injected by JS -->
+                            <tr id="table-headers">
+                                <th class="px-6 py-3">級數 (\(n\))</th>
+                                <th class="px-6 py-3">計算公式 (\(\sin \theta\))</th>
+                                <th class="px-6 py-3 text-right">繞射角 (\(\theta\))</th>
                             </tr>
                         </thead>
-                        <tbody id="data-table-body" class="divide-y divide-gray-700">
+                        <tbody id="data-table-body" class="divide-y divide-gray-700 transition-opacity duration-300">
                             <!-- Rows will be populated by JS -->
                         </tbody>
                     </table>
                 </div>
-                <div id="warning-msg" class="hidden p-3 bg-red-900/30 text-red-300 text-xs text-center border-t border-red-900">
-                    注意：部分高階級數因 $\sin \theta > 1$ 而無法形成。
+                <div id="warning-msg" class="hidden p-3 bg-red-900/30 text-red-300 text-xs text-center border-t border-red-900 transition-opacity">
+                    注意：部分高階級數因 \(\sin \theta > 1\) 而無法形成。
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Modal Structure -->
+    <div id="theory-modal" class="modal fixed w-full h-full top-0 left-0 flex items-center justify-center opacity-0 pointer-events-none z-50">
+        <div class="modal-overlay absolute w-full h-full bg-black opacity-50"></div>
+        
+        <div class="modal-container bg-gray-800 w-11/12 md:max-w-xl mx-auto rounded shadow-lg z-50 overflow-y-auto transform scale-95 transition-transform duration-300 border border-gray-600 max-h-[90vh]">
+            
+            <div class="modal-content py-4 text-left px-6">
+                <!-- Title -->
+                <div class="flex justify-between items-center pb-3 border-b border-gray-600">
+                    <p class="text-xl font-bold text-blue-400" id="txt-modal-title">原理提示</p>
+                    <div class="modal-close cursor-pointer z-50 text-gray-300 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="my-5 text-gray-300 text-sm leading-relaxed" id="txt-modal-body">
+                    <!-- Content will be injected by JS -->
+                </div>
+
+                <!-- Footer -->
+                <div class="flex justify-end pt-2">
+                    <button class="modal-close px-4 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-colors text-sm font-bold">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // --- Translations ---
+        const i18n = {
+            zh: {
+                title: "物理實驗室：繞射光柵 (Diffraction Grating)",
+                subtitle: "公式驗證",
+                btnTheory: "原理解說",
+                params: "實驗參數設定",
+                source: "光源類型",
+                white: "白光",
+                mono: "單色光",
+                wavelength: "激光波長",
+                density: "光柵線密度",
+                spacing: "光柵間距",
+                calcMethod: "計算方法",
+                screenView: "模擬屏幕視角",
+                centerSpot: "0° (中央亮紋)",
+                data: "測量數據",
+                maxOrder: "最大級數",
+                thOrder: "級數 (\\(n\\))",
+                thFormula: "計算公式 (\\(\\sin \\theta\\))",
+                thAngle: "繞射角 (\\(\\theta\\))",
+                thViolet: "紫端 (380 nm)",
+                thRed: "紅端 (750 nm)",
+                warning: "注意：部分高階級數因 \\(\\sin \\theta > 1\\) 而無法形成。",
+                modalTitle: "原理解說：繞射與干涉",
+                modalBody: `
+                    <div class="space-y-4">
+                        <p>光柵由大量等寬、等間距的平行狹縫組成。圖樣的形成主要基於兩個物理現象：</p>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li>
+                                <strong class="text-blue-300">繞射 (Diffraction)：</strong>
+                                當光波通過狹縫時，會向各個方向擴散（散開），而不僅僅是直線傳播。這使得光線能夠到達屏幕上的不同位置。
+                            </li>
+                            <li>
+                                <strong class="text-blue-300">干涉 (Interference)：</strong>
+                                來自不同狹縫的繞射光波在空間中重疊。
+                                <br>當相鄰狹縫的光程差 \\(\\Delta L = d \\sin \\theta\\) 剛好是波長 \\(\\lambda\\) 的整數倍（\\(n\\lambda\\)）時，波峰遇上波峰，發生<strong>建設性干涉 (Constructive Interference)</strong>，形成亮紋（極大值）。
+                            </li>
+                        </ul>
+                        <div class="bg-gray-700/50 p-3 rounded border-l-4 border-yellow-500">
+                            <p class="font-bold text-yellow-400 mb-1">為什麼會形成彩色光譜？</p>
+                            <p>根據公式 \\(\\sin \\theta = \\frac{n\\lambda}{d}\\)，繞射角 \\(\\theta\\) 與波長 \\(\\lambda\\) 成正比。紅光波長較長，偏折角度大；紫光波長較短，偏折角度小。因此，白光通過光柵後會被「色散」開來，形成彩虹般的光譜。</p>
+                        </div>
+                        <div class="bg-gray-700/50 p-3 rounded border-l-4 border-red-500">
+                            <p class="font-bold text-red-300 mb-1">為什麼光譜會出現重疊？</p>
+                            <p>當級數 \\( n \\) 較高時（例如 \\( n=2 \\) 和 \\( n=3 \\)），較低級數的紅光端（波長較長）的繞射角，可能大於較高級數的紫光端（波長較短）的繞射角。例如：\\( 2 \\times 700 \\text{nm} \\approx 1400 \\) 與 \\( 3 \\times 400 \\text{nm} = 1200 \\) 數值相近。這會導致不同級數的光譜在空間上發生重疊。</p>
+                        </div>
+                    </div>
+                `,
+                notFormed: "無法形成",
+                central0: "0 (中央)"
+            },
+            en: {
+                title: "Physics Lab: Diffraction Grating",
+                subtitle: "Formula Verification",
+                btnTheory: "Theory Info",
+                params: "Parameters",
+                source: "Light Source",
+                white: "White Light",
+                mono: "Monochromatic",
+                wavelength: "Wavelength",
+                density: "Grating Density",
+                spacing: "Grating Spacing",
+                calcMethod: "Calculation",
+                screenView: "Screen View",
+                centerSpot: "0° (Central Max)",
+                data: "Measurement Data",
+                maxOrder: "Max Order",
+                thOrder: "Order (\\(n\\))",
+                thFormula: "Formula (\\(\\sin \\theta\\))",
+                thAngle: "Angle (\\(\\theta\\))",
+                thViolet: "Violet End (380 nm)",
+                thRed: "Red End (750 nm)",
+                warning: "Note: Some higher orders cannot form because \\(\\sin \\theta > 1\\).",
+                modalTitle: "Theory: Diffraction & Interference",
+                modalBody: `
+                    <div class="space-y-4">
+                        <p>A diffraction grating consists of many equally spaced parallel slits. The pattern forms due to two main phenomena:</p>
+                        <ul class="list-disc pl-5 space-y-2">
+                            <li>
+                                <strong class="text-blue-300">Diffraction:</strong>
+                                When light passes through the slits, it spreads out (diffracts) in all directions, allowing light to reach different parts of the screen.
+                            </li>
+                            <li>
+                                <strong class="text-blue-300">Interference:</strong>
+                                Diffracted waves from different slits overlap. 
+                                <br>When the path difference \\(\\Delta L = d \\sin \\theta\\) between adjacent slits is an integer multiple of the wavelength (\\(n\\lambda\\)), the waves align peak-to-peak. This causes <strong>Constructive Interference</strong>, creating bright spots (maxima).
+                            </li>
+                        </ul>
+                        <div class="bg-gray-700/50 p-3 rounded border-l-4 border-yellow-500">
+                            <p class="font-bold text-yellow-400 mb-1">Why a Color Spectrum?</p>
+                            <p>According to \\(\\sin \\theta = \\frac{n\\lambda}{d}\\), the angle \\(\\theta\\) is proportional to wavelength \\(\\lambda\\). Red light (longer \\(\\lambda\\)) diffracts at a larger angle than violet light (shorter \\(\\lambda\\)). This separates white light into a spectrum.</p>
+                        </div>
+                        <div class="bg-gray-700/50 p-3 rounded border-l-4 border-red-500">
+                            <p class="font-bold text-red-300 mb-1">Why do Spectra Overlap?</p>
+                            <p>At higher orders (e.g., \\( n=2 \\) and \\( n=3 \\)), the diffraction angle for the red end (longer wavelength) of a lower order might exceed the angle for the violet end (shorter wavelength) of a higher order. For example, \\( 2 \\times 700 \\text{nm} \\) is comparable to \\( 3 \\times 400 \\text{nm} \\). This causes spectra from different orders to overlap.</p>
+                        </div>
+                    </div>
+                `,
+                notFormed: "Not Formed",
+                central0: "0 (Center)"
+            }
+        };
+
         // --- Constants & Elements ---
         const lambdaSlider = document.getElementById('lambda-slider');
         const lambdaDisplay = document.getElementById('lambda-display');
@@ -141,17 +318,57 @@
         const dValueDisplay = document.getElementById('d-value');
         const maxOrderDisplay = document.getElementById('max-order');
         const tableBody = document.getElementById('data-table-body');
+        const tableHeaders = document.getElementById('table-headers');
         const canvas = document.getElementById('diffraction-canvas');
         const ctx = canvas.getContext('2d');
         
+        // Switch Elements
+        const switchContainer = document.getElementById('switch-container');
+        const switchPill = document.getElementById('switch-pill');
+        const btnWhite = document.getElementById('btn-white');
+        const btnMono = document.getElementById('btn-mono');
+        
+        const wavelengthControl = document.getElementById('wavelength-control');
+        const warningMsg = document.getElementById('warning-msg');
+        const maxOrderContainer = document.getElementById('max-order-container');
+
+        // Modal Elements
+        const modal = document.getElementById('theory-modal');
+        const theoryBtn = document.getElementById('theory-btn');
+        const modalCloses = document.querySelectorAll('.modal-close');
+        const langBtn = document.getElementById('lang-btn');
+
+        // Text Elements for I18n
+        const txtElements = {
+            'txt-title': 'title',
+            'txt-subtitle': 'subtitle',
+            'txt-theory-btn': 'btnTheory',
+            'txt-params': 'params',
+            'txt-source': 'source',
+            'label-white': 'white',
+            'label-monochrome': 'mono',
+            'txt-wavelength': 'wavelength',
+            'txt-density': 'density',
+            'txt-spacing': 'spacing',
+            'txt-calc-method': 'calcMethod',
+            'txt-screen-view': 'screenView',
+            'txt-center-spot': 'centerSpot',
+            'txt-data': 'data',
+            'txt-max-order': 'maxOrder',
+            'txt-modal-title': 'modalTitle',
+            'txt-modal-body': 'modalBody'
+        };
+
         // --- State ---
         let state = {
-            lambda: 532, // nm
-            linesPerMm: 500 // N
+            isWhiteLight: false, // false = Mono, true = White
+            lambda: 532, // nm (for monochrome mode)
+            linesPerMm: 500, // N
+            lang: 'zh'
         };
 
         // --- Color Utility ---
-        function wavelengthToColor(wavelength) {
+        function wavelengthToColor(wavelength, alphaFactor = 1.0) {
             let R, G, B, alpha;
             if (wavelength >= 380 && wavelength < 440) {
                 R = -(wavelength - 440) / (440 - 380); G = 0; B = 1;
@@ -169,79 +386,150 @@
                 R = 0; G = 0; B = 0;
             }
             
-            // Intensity falloff near ends of spectrum
+            // Intensity falloff
             if (wavelength > 700) alpha = 0.3 + 0.7 * (750 - wavelength) / (750 - 700);
             else if (wavelength < 420) alpha = 0.3 + 0.7 * (wavelength - 380) / (420 - 380);
             else alpha = 1;
-
+            
+            alpha *= alphaFactor;
             return `rgba(${R * 255}, ${G * 255}, ${B * 255}, ${alpha})`;
         }
 
-        // --- Physics Calculation ---
-        function calculate() {
-            // d = 1 / N (mm) -> convert to meters
-            // N is in lines/mm
-            const d_mm = 1 / state.linesPerMm;
-            const d_m = d_mm * 1e-3;
-            const d_microns = d_mm * 1000;
-            
-            // lambda in meters
-            const lambda_m = state.lambda * 1e-9;
+        // --- Physics Calculation (Robust) ---
+        function calculate(wavelengthNm) {
+            // Ensure inputs are numbers
+            const N = Number(state.linesPerMm);
+            const lambda = Number(wavelengthNm);
 
-            // Calculate Max Order: sin(theta) <= 1 => n * lambda / d <= 1 => n <= d / lambda
+            const d_mm = 1 / N; // mm
+            const d_m = d_mm * 1e-3; // meters
+            const d_microns = d_mm * 1000; // microns
+            
+            const lambda_m = lambda * 1e-9; // meters
+
+            // Max Order: n * lambda = d * sin(theta) <= d  => n <= d / lambda
             const maxOrder = Math.floor(d_m / lambda_m);
 
-            return {
-                d_microns,
-                d_m,
-                lambda_m,
-                maxOrder
-            };
+            return { d_microns, d_m, lambda_m, maxOrder };
         }
 
         // --- UI Updates ---
         function updateUI() {
-            const calc = calculate();
-            const color = wavelengthToColor(state.lambda);
-            
-            // Update Text Displays
-            lambdaDisplay.textContent = `${state.lambda} nm`;
-            lambdaDisplay.style.color = color;
-            lambdaDisplay.style.textShadow = `0 0 10px ${color}`;
-            
-            linesDisplay.textContent = `${state.linesPerMm} lines/mm`;
-            dValueDisplay.textContent = calc.d_microns.toFixed(2);
-            maxOrderDisplay.textContent = calc.maxOrder;
+            const txt = i18n[state.lang];
 
-            // Style Sliders
-            lambdaSlider.style.setProperty('--thumb-color', color);
+            // 0. Update Language Text
+            for (const [id, key] of Object.entries(txtElements)) {
+                const el = document.getElementById(id);
+                if(el) {
+                    if (id === 'txt-modal-body') el.innerHTML = txt[key];
+                    else el.innerText = txt[key];
+                }
+            }
+            warningMsg.innerText = txt.warning;
+
+            // 1. Handle Toggle State UI (Segmented Control)
+            if (state.isWhiteLight) {
+                // White Light Mode
+                switchPill.classList.remove('translate-x-full'); // Move Left (White)
+                switchPill.classList.add('translate-x-0');
+                
+                btnWhite.classList.remove('text-gray-400');
+                btnWhite.classList.add('text-white');
+                btnMono.classList.remove('text-white');
+                btnMono.classList.add('text-gray-400');
+
+                wavelengthControl.style.opacity = '0.3';
+                wavelengthControl.style.pointerEvents = 'none';
+                lambdaSlider.disabled = true;
+                
+                tableBody.style.opacity = '1';
+                warningMsg.style.opacity = '1';
+                maxOrderContainer.style.opacity = '0';
+                
+                // Set White Light Headers
+                tableHeaders.innerHTML = `
+                    <th class="px-6 py-3">${txt.thOrder}</th>
+                    <th class="px-6 py-3 text-purple-300">${txt.thViolet}</th>
+                    <th class="px-6 py-3 text-right text-red-300">${txt.thRed}</th>
+                `;
+
+            } else {
+                // Monochrome Mode
+                switchPill.classList.remove('translate-x-0');
+                switchPill.classList.add('translate-x-full'); // Move Right (Mono)
+
+                btnWhite.classList.remove('text-white');
+                btnWhite.classList.add('text-gray-400');
+                btnMono.classList.remove('text-gray-400');
+                btnMono.classList.add('text-white');
+
+                wavelengthControl.style.opacity = '1';
+                wavelengthControl.style.pointerEvents = 'auto';
+                lambdaSlider.disabled = false;
+                
+                tableBody.style.opacity = '1';
+                warningMsg.style.opacity = '1';
+                maxOrderContainer.style.opacity = '1';
+
+                // Set Monochrome Headers
+                tableHeaders.innerHTML = `
+                    <th class="px-6 py-3">${txt.thOrder}</th>
+                    <th class="px-6 py-3">${txt.thFormula}</th>
+                    <th class="px-6 py-3 text-right">${txt.thAngle}</th>
+                `;
+            }
+
+            // 2. Update Shared Displays
+            linesDisplay.textContent = `${state.linesPerMm} lines/mm`;
+            const baseCalc = calculate(state.lambda); 
+            dValueDisplay.textContent = baseCalc.d_microns.toFixed(2);
+
+            // 3. Mode-Specific Logic
+            if (state.isWhiteLight) {
+                drawWhiteLightSimulation(baseCalc.d_m);
+                updateTableWhiteLight(baseCalc.d_m);
+            } else {
+                const calc = calculate(state.lambda);
+                const color = wavelengthToColor(state.lambda);
+                
+                lambdaDisplay.textContent = `${state.lambda} nm`;
+                lambdaDisplay.style.color = color;
+                lambdaDisplay.style.textShadow = `0 0 10px ${color}`;
+                maxOrderDisplay.textContent = calc.maxOrder;
+
+                lambdaSlider.style.setProperty('--thumb-color', color);
+                updateSliderThumbStyle(color);
+
+                updateTable(calc);
+                drawMonochromeSimulation(calc, color);
+            }
             
-            // Need to inject style rule for slider thumb because inline styles don't work on pseudo-elements easily
-            const sheet = document.createElement('style');
+            // Rerender MathJax
+            if (window.MathJax) {
+                MathJax.typesetPromise();
+            }
+        }
+
+        function updateSliderThumbStyle(color) {
+             const sheet = document.createElement('style');
             sheet.innerHTML = `
                 #lambda-slider::-webkit-slider-thumb { background: ${color} !important; box-shadow: 0 0 10px ${color}; width: 16px; height: 16px; border-radius: 50%; margin-top: -4px; }
                 #lambda-slider::-moz-range-thumb { background: ${color} !important; box-shadow: 0 0 10px ${color}; }
             `;
-            // Remove old style tag if exists to avoid clutter, but for this simple app appending is fine or clearing
             const existingStyle = document.getElementById('dynamic-slider-style');
             if(existingStyle) existingStyle.remove();
             sheet.id = 'dynamic-slider-style';
             document.head.appendChild(sheet);
-
-            // Update Table
-            updateTable(calc);
-            
-            // Draw Canvas
-            drawSimulation(calc, color);
         }
 
         function updateTable(calc) {
             tableBody.innerHTML = '';
+            const txt = i18n[state.lang];
             
             // Row for n=0
             const row0 = `
                 <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors">
-                    <td class="px-6 py-4 font-medium text-white">0 (中央)</td>
+                    <td class="px-6 py-4 font-medium text-white">${txt.central0}</td>
                     <td class="px-6 py-4 font-mono text-gray-400">0.000</td>
                     <td class="px-6 py-4 text-right font-bold text-blue-300">0.0°</td>
                 </tr>
@@ -260,71 +548,152 @@
                         <td class="px-6 py-4 text-right font-bold text-blue-300">${thetaDeg}°</td>
                     </tr>
                 `;
-                tableBody.insertAdjacentHTML('beforeend', row);
+                tableBody.insertAdjacentHTML('beforeend', row0);
             }
+             warningMsg.classList.toggle('hidden', calc.maxOrder >= 4); 
+        }
+        
+        function updateTableWhiteLight(d_m) {
+            tableBody.innerHTML = '';
+            const txt = i18n[state.lang];
+
+            // Central Maxima (n=0)
+            const row0 = `
+                <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors">
+                    <td class="px-6 py-4 font-medium text-white">${txt.central0}</td>
+                    <td class="px-6 py-4 font-mono text-gray-400">0.0°</td>
+                    <td class="px-6 py-4 text-right font-mono text-gray-400">0.0°</td>
+                </tr>
+            `;
+            tableBody.insertAdjacentHTML('beforeend', row0);
+
+            let n = 1;
+            let showWarning = false;
+            
+            while(true) {
+                // Violet (380nm)
+                const lambdaV = 380e-9;
+                const sinV = (n * lambdaV) / d_m;
+
+                // Red (750nm)
+                const lambdaR = 750e-9;
+                const sinR = (n * lambdaR) / d_m;
+
+                if (sinV > 1) break;
+
+                const thetaV = (Math.asin(sinV) * 180 / Math.PI).toFixed(1) + '°';
+                let thetaR = '';
+                
+                if (sinR > 1) {
+                    thetaR = `<span class="text-gray-500 italic text-xs">${txt.notFormed}</span>`;
+                    showWarning = true;
+                } else {
+                    thetaR = (Math.asin(sinR) * 180 / Math.PI).toFixed(1) + '°';
+                }
+
+                const row = `
+                    <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors border-t border-gray-700">
+                        <td class="px-6 py-4 font-medium text-white">±${n}</td>
+                        <td class="px-6 py-4 font-mono text-purple-300 font-bold">${thetaV}</td>
+                        <td class="px-6 py-4 text-right font-mono text-red-300 font-bold">${thetaR}</td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+                
+                if (n > 10) break; 
+                n++;
+            }
+            warningMsg.classList.toggle('hidden', !showWarning);
         }
 
-        function drawSimulation(calc, color) {
-            // Canvas setup
+        function getCanvasMetrics() {
             const width = canvas.parentElement.clientWidth;
             const height = canvas.parentElement.clientHeight;
             canvas.width = width;
             canvas.height = height;
-            
-            const centerY = height / 2;
-            const centerX = width / 2;
-            
-            ctx.clearRect(0, 0, width, height);
+            return {
+                width, height,
+                centerY: height / 2,
+                centerX: width / 2,
+                pixelsPerDegree: (width / 2) * 0.9 / 90 // Map 90 deg to 90% of half width
+            };
+        }
+        
+        function drawMonochromeSimulation(calc, color) {
+            const m = getCanvasMetrics();
+            ctx.clearRect(0, 0, m.width, m.height);
             
             // Draw Central Maxima (n=0)
-            drawSpot(centerX, centerY, color, 1.5, 20);
+            drawSpot(m.centerX, m.centerY, color, 1.5, 20);
 
             // Draw Orders
-            // To visualize angle on a flat screen, we map -90 to 90 degrees to the canvas width.
-            // Let's say the canvas width represents 180 degrees field of view for visualization purposes.
-            // x position = (theta / 90) * (width / 2) + center
-            
             for (let n = 1; n <= calc.maxOrder; n++) {
                 const sinTheta = (n * calc.lambda_m) / calc.d_m;
-                const thetaRad = Math.asin(sinTheta);
-                const thetaDeg = thetaRad * 180 / Math.PI;
-                
-                // Map theta to X position (Simple linear mapping for visualization of angle)
-                // Scale: 90 degrees = width/2 roughly
-                const offsetPixels = (thetaDeg / 90) * (width / 2) * 0.9; // 0.9 padding
-                
-                // Intensity decreases with order (Simulated physics approximation)
+                const thetaDeg = Math.asin(sinTheta) * 180 / Math.PI;
+                const offsetPixels = thetaDeg * m.pixelsPerDegree;
                 const intensity = 1 / (n * 0.8 + 1); 
 
-                // Right side (+n)
-                drawSpot(centerX + offsetPixels, centerY, color, intensity, 15 - n);
-                
-                // Left side (-n)
-                drawSpot(centerX - offsetPixels, centerY, color, intensity, 15 - n);
+                // FIX: Ensure radius is at least 2 to prevent negative radius error
+                const radius = Math.max(2, 15 - n);
+                drawSpot(m.centerX + offsetPixels, m.centerY, color, intensity, radius);
+                drawSpot(m.centerX - offsetPixels, m.centerY, color, intensity, radius);
 
-                // Draw connecting lines for visual clarity (optional, faint)
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY + 40);
-                ctx.lineTo(centerX + offsetPixels, centerY + 40);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                ctx.stroke();
-                
-                // Label the angle on canvas
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'center';
-                if (n <= 2 || calc.maxOrder < 4) { // Don't clutter if too many orders
-                    ctx.fillText(`n=${n}`, centerX + offsetPixels, centerY - 25);
-                    ctx.fillText(`${thetaDeg.toFixed(1)}°`, centerX + offsetPixels, centerY - 12);
+                if (n <= 2 || calc.maxOrder < 4) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`n=${n}`, m.centerX + offsetPixels, m.centerY - 25);
+                    ctx.fillText(`${thetaDeg.toFixed(1)}°`, m.centerX + offsetPixels, m.centerY - 12);
+                    ctx.fillText(`n=-${n}`, m.centerX - offsetPixels, m.centerY - 25);
+                    ctx.fillText(`${thetaDeg.toFixed(1)}°`, m.centerX - offsetPixels, m.centerY - 12);
+                }
+            }
+        }
+
+        function drawWhiteLightSimulation(d_m) {
+            const m = getCanvasMetrics();
+            ctx.clearRect(0, 0, m.width, m.height);
+
+            drawSpot(m.centerX, m.centerY, 'rgba(255,255,255,1)', 1.5, 20);
+
+            const maxOrderViolet = Math.floor(d_m / (380e-9));
+            const ordersToDraw = Math.min(maxOrderViolet, 5); 
+
+            for (let n = 1; n <= ordersToDraw; n++) {
+                 const intensityBase = 1 / (n * 0.8 + 0.5);
+                 
+                 for (let wl = 380; wl <= 750; wl += 2) {
+                    const lambda_m = wl * 1e-9;
+                    const sinTheta = (n * lambda_m) / d_m;
                     
-                    ctx.fillText(`n=-${n}`, centerX - offsetPixels, centerY - 25);
-                    ctx.fillText(`${thetaDeg.toFixed(1)}°`, centerX - offsetPixels, centerY - 12);
+                    if (sinTheta > 1) break;
+
+                    const thetaDeg = Math.asin(sinTheta) * 180 / Math.PI;
+                    const offsetPixels = thetaDeg * m.pixelsPerDegree;
+                    const color = wavelengthToColor(wl, intensityBase * 0.3);
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(m.centerX + offsetPixels - 0.5, m.centerY - 15, 1, 30);
+                    ctx.fillRect(m.centerX - offsetPixels - 0.5, m.centerY - 15, 1, 30);
+                 }
+                 
+                const sinThetaCenter = (n * 550e-9) / d_m;
+                if(sinThetaCenter <= 1) {
+                    const thetaDegCenter = Math.asin(sinThetaCenter) * 180 / Math.PI;
+                    const offsetPixelsCenter = thetaDegCenter * m.pixelsPerDegree;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`n=±${n}`, m.centerX + offsetPixelsCenter, m.centerY - 25);
+                    ctx.fillText(`n=±${n}`, m.centerX - offsetPixelsCenter, m.centerY - 25);
                 }
             }
         }
 
         function drawSpot(x, y, color, intensity, radiusBase) {
-            // Main Spot
+            // FIX: Guard against non-positive radius just in case
+            if (radiusBase <= 0) return;
+
             ctx.beginPath();
             ctx.arc(x, y, radiusBase, 0, Math.PI * 2);
             ctx.fillStyle = color;
@@ -333,7 +702,6 @@
             ctx.shadowColor = color;
             ctx.fill();
             
-            // Core white hot center
             ctx.beginPath();
             ctx.arc(x, y, radiusBase * 0.3, 0, Math.PI * 2);
             ctx.fillStyle = 'white';
@@ -341,11 +709,9 @@
             ctx.shadowBlur = 5;
             ctx.fill();
 
-            // Reset context
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1.0;
             
-            // Vertical slit look (since it's a grating)
             ctx.fillStyle = color;
             ctx.globalAlpha = 0.2 * intensity;
             ctx.fillRect(x - 2, 0, 4, canvas.height);
@@ -363,11 +729,59 @@
             updateUI();
         });
 
-        // Handle window resize
-        window.addEventListener('resize', updateUI);
+        // Switch Logic (New)
+        function setWhiteLightMode(isWhite) {
+            state.isWhiteLight = isWhite;
+            updateUI();
+        }
 
-        // Initial Load
-        updateUI();
+        btnWhite.addEventListener('click', () => setWhiteLightMode(true));
+        btnMono.addEventListener('click', () => setWhiteLightMode(false));
+        // Click on background also works, but buttons cover most area
+        switchContainer.addEventListener('click', (e) => {
+             // Simple toggle if clicked on the container background (between buttons)
+             if(e.target === switchContainer) {
+                 setWhiteLightMode(!state.isWhiteLight);
+             }
+        });
+
+        // Modal Logic
+        function toggleModal() {
+            const body = document.querySelector('body');
+            modal.classList.toggle('opacity-0');
+            modal.classList.toggle('pointer-events-none');
+            body.classList.toggle('modal-active');
+            
+            // Re-render MathJax inside modal if it's being opened
+            if (!modal.classList.contains('opacity-0') && window.MathJax) {
+                MathJax.typesetPromise([document.getElementById('theory-modal')]);
+            }
+        }
+
+        theoryBtn.addEventListener('click', toggleModal);
+        
+        modalCloses.forEach(el => {
+            el.addEventListener('click', toggleModal);
+        });
+
+        document.onkeydown = function(evt) {
+            evt = evt || window.event;
+            if (evt.keyCode == 27) { // Escape key
+                if(!modal.classList.contains('opacity-0')) toggleModal();
+            }
+        };
+        
+        // Language Logic
+        langBtn.addEventListener('click', () => {
+            state.lang = state.lang === 'zh' ? 'en' : 'zh';
+            updateUI();
+        });
+
+        window.addEventListener('resize', updateUI);
+        
+        window.addEventListener('load', () => {
+             updateUI();
+        });
 
     </script>
 </body>

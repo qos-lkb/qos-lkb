@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>中一科學：細胞構造互動圖</title>
+    <title>細胞結構 Structure of Cell</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts (Noto Sans TC) -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts (Noto Sans TC & Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     
     <style>
         body {
-            font-family: 'Noto Sans TC', sans-serif;
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
         }
         /* Custom animations for interaction feedback */
         .selected-part {
@@ -59,8 +59,39 @@
         /* Sidebar active state */
         .nav-active {
             background-color: white;
-            color: #059669; /* emerald-600 */
-            border-right: 4px solid #059669;
+            color: black !important;
+            border-right: 4px solid #059669; /* emerald-600 */
+        }
+        /* Table Styles */
+        .compare-table th, .compare-table td {
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            text-align: center;
+        }
+        .compare-table th {
+            background-color: #f0fdf4; /* green-50 */
+            color: #166534; /* green-800 */
+            font-weight: bold;
+        }
+        .compare-table tr:nth-child(even) {
+            background-color: #f9fafb; /* gray-50 */
+        }
+        .check-icon { color: #16a34a; font-weight: bold; }
+        .cross-icon { color: #dc2626; font-weight: bold; }
+        /* Custom Scrollbar for the floating card */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
         }
     </style>
 </head>
@@ -70,79 +101,100 @@
     <header class="bg-emerald-600 text-white p-4 shadow-md flex-shrink-0 z-20 flex justify-between items-center">
         <div class="flex items-center gap-3">
             <span class="text-2xl">🔬</span>
-            <h1 class="text-xl md:text-2xl font-bold tracking-wide">細胞構造探索 (Cell Structure)</h1>
+            <!-- Updated Title -->
+            <h1 id="app-title" class="text-xl md:text-2xl font-bold tracking-wide">細胞構造 Structure of Cell</h1>
         </div>
-        <span class="text-sm bg-emerald-700 px-3 py-1 rounded-full border border-emerald-500">中一科學級別</span>
+        
+        <div class="flex items-center gap-3">
+            <!-- Compare Button -->
+            <button onclick="openModal()" class="flex items-center gap-2 bg-white text-emerald-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold shadow hover:bg-emerald-50 transition transform hover:scale-105 text-sm md:text-base">
+                <span>📊</span>
+                <span id="btn-compare-text" class="hidden md:inline">比較圖表</span>
+            </button>
+            
+            <!-- Language Toggle -->
+            <button onclick="toggleLanguage()" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold shadow text-xs md:text-sm border border-emerald-500 whitespace-nowrap">
+                <span id="lang-btn-text">中 / EN</span>
+            </button>
+        </div>
     </header>
 
     <!-- Main Container -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden relative">
 
-        <!-- Sidebar Navigation -->
-        <nav class="w-24 md:w-32 bg-gray-800 flex flex-col items-center py-6 gap-4 shadow-lg z-10 flex-shrink-0">
+        <!-- Sidebar Navigation (Fixed Left) -->
+        <nav class="w-24 md:w-32 bg-gray-800 flex flex-col items-center py-6 gap-4 shadow-lg z-20 flex-shrink-0 h-full">
             <button onclick="switchMode('plant')" id="btn-plant" class="nav-btn w-full py-4 flex flex-col items-center gap-2 text-gray-400 hover:text-white transition-colors nav-active">
                 <span class="text-3xl">🌱</span>
-                <span class="text-xs md:text-sm font-bold">植物細胞</span>
+                <span id="nav-plant-text" class="text-xs md:text-sm font-bold text-center">植物細胞</span>
             </button>
             <button onclick="switchMode('animal')" id="btn-animal" class="nav-btn w-full py-4 flex flex-col items-center gap-2 text-gray-400 hover:text-white transition-colors">
                 <span class="text-3xl">🦁</span>
-                <span class="text-xs md:text-sm font-bold">動物細胞</span>
+                <span id="nav-animal-text" class="text-xs md:text-sm font-bold text-center">動物細胞</span>
             </button>
         </nav>
 
-        <!-- Content Area (Diagram + Info) -->
-        <main class="flex-1 flex flex-col md:flex-row bg-white relative">
+        <!-- Content Area (Diagram + Floating Info) -->
+        <main class="flex-1 relative bg-gray-50 overflow-hidden">
             
-            <!-- Left Column: Interactive Diagram Container -->
-            <div class="w-full md:w-3/5 h-1/2 md:h-full bg-white relative flex justify-center items-center p-4 overflow-auto border-b md:border-b-0 md:border-r border-gray-200">
+            <!-- 1. Interactive Diagram Container (Full Screen Layer) -->
+            <div class="absolute inset-0 w-full h-full flex justify-center items-center p-4 overflow-hidden z-0">
                 
-                <div class="absolute top-4 left-4 bg-yellow-100 text-yellow-800 text-sm px-3 py-1 rounded-lg shadow animate-pulse pointer-events-none z-20">
+                <div id="hint-bubble" class="absolute top-4 left-4 bg-yellow-100 text-yellow-800 text-sm px-3 py-1 rounded-lg shadow animate-pulse pointer-events-none z-10">
                     👆 點擊標示或構造以查看
                 </div>
 
                 <!-- PLANT CELL VIEW -->
-                <div id="view-plant" class="w-full h-full flex justify-center items-center">
-                    <svg viewBox="0 0 700 450" class="w-full h-full max-w-4xl select-none" preserveAspectRatio="xMidYMid meet">
-                        <g transform="translate(140, 0)">
+                <div id="view-plant" class="w-full h-full flex justify-center items-center transition-opacity duration-300">
+                    <svg viewBox="0 0 800 450" class="w-full h-full max-w-5xl select-none" preserveAspectRatio="xMidYMid meet">
+                        <g transform="translate(200, 0)">
                             <!-- 1. Cell Wall -->
                             <g id="plant-cell-wall" class="hover-part group" onclick="selectPart('cell-wall')">
                                 <path d="M50,80 Q50,30 100,30 H500 Q550,30 550,80 V370 Q550,420 500,420 H100 Q50,420 50,370 Z" fill="#4ade80" stroke="#15803d" stroke-width="6" />
-                                <text id="label-plant-cell-wall" x="-130" y="80" class="label-text" text-anchor="start">1. 細胞壁</text>
-                                <line x1="-50" y1="75" x2="45" y2="75" class="connector-line" />
+                                <text id="label-plant-cell-wall" x="-190" y="80" class="label-text" text-anchor="start">1. 細胞壁</text>
+                                <!-- Line extended right from 45 to 50 to touch the wall -->
+                                <line x1="-50" y1="75" x2="50" y2="75" class="connector-line" />
                             </g>
                             <!-- 2. Cell Membrane -->
                             <g id="plant-cell-membrane" class="hover-part" onclick="selectPart('cell-membrane')">
                                 <path d="M65,85 Q65,45 105,45 H495 Q535,45 535,85 V365 Q535,405 495,405 H105 Q65,405 65,365 Z" fill="#dcfce7" stroke="#fbbf24" stroke-width="3" />
-                                <text id="label-plant-cell-membrane" x="-130" y="120" class="label-text" text-anchor="start">2. 細胞膜</text>
-                                <line x1="-50" y1="115" x2="63" y2="115" class="connector-line" />
+                                <text id="label-plant-cell-membrane" x="-190" y="120" class="label-text" text-anchor="start">2. 細胞膜</text>
+                                <!-- Line extended right from 60 to 65 to touch the membrane -->
+                                <line x1="-50" y1="115" x2="65" y2="115" class="connector-line" />
                             </g>
                             <!-- 7. Cytoplasm -->
                             <g id="plant-cytoplasm" class="hover-part" onclick="selectPart('cytoplasm')">
                                 <path d="M70,90 Q70,50 110,50 H490 Q530,50 530,90 V360 Q530,400 490,400 H110 Q70,400 70,360 Z" fill="transparent" />
-                                <text id="label-plant-cytoplasm" x="-130" y="380" class="label-text" text-anchor="start">7. 細胞質</text>
-                                <line x1="-50" y1="375" x2="150" y2="375" class="connector-line" />
+                                <text id="label-plant-cytoplasm" x="-190" y="380" class="label-text" text-anchor="start">7. 細胞質</text>
+                                <!-- Line extended left to -50 -->
+                                <line x1="-50" y1="375" x2="80" y2="375" class="connector-line" />
                             </g>
                             <!-- 4. Vacuole -->
                             <g id="plant-vacuole" class="hover-part" onclick="selectPart('vacuole')">
                                 <path d="M220,150 Q350,130 440,180 Q480,250 450,330 Q350,380 240,350 Q170,280 220,150 Z" fill="#bae6fd" stroke="#0ea5e9" stroke-width="2" opacity="0.9" />
-                                <text id="label-plant-vacuole" x="-130" y="250" class="label-text" text-anchor="start">4. 液泡</text>
+                                <text id="label-plant-vacuole" x="-190" y="250" class="label-text" text-anchor="start">4. 液泡</text>
+                                <!-- Line extended left to -50 -->
                                 <line x1="-50" y1="245" x2="250" y2="245" class="connector-line" />
                             </g>
                             <!-- 3. Nucleus -->
                             <g id="plant-nucleus" class="hover-part" onclick="selectPart('nucleus')">
                                 <circle cx="140" cy="160" r="35" fill="#e9d5ff" stroke="#9333ea" stroke-width="3" />
                                 <circle cx="140" cy="160" r="9" fill="#9333ea" opacity="0.5" />
-                                <text id="label-plant-nucleus" x="-130" y="160" class="label-text" text-anchor="start">3. 細胞核</text>
+                                <text id="label-plant-nucleus" x="-190" y="160" class="label-text" text-anchor="start">3. 細胞核</text>
+                                <!-- Line extended left to -50 -->
                                 <line x1="-50" y1="155" x2="105" y2="155" class="connector-line" />
                             </g>
                             <!-- 5. Mitochondrion -->
                             <g id="plant-mitochondrion" class="hover-part" onclick="selectPart('mitochondrion')">
                                 <g transform="translate(300, 380) scale(0.7) rotate(0)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
-                                <g transform="translate(420, 70) scale(0.7) rotate(-45)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
-                                <g transform="translate(90, 295) scale(0.7) rotate(90)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
+                                <!-- Moved top-right mitochondrion left and down (from 420, 70 to 380, 100) -->
+                                <g transform="translate(380, 100) scale(0.7) rotate(-45)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
+                                <!-- Moved up from 295 to 280 to align center with the label line -->
+                                <g transform="translate(110, 280) scale(0.7) rotate(90)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
                                 <g transform="translate(510, 300) scale(0.7) rotate(90)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
-                                <text id="label-plant-mitochondrion" x="-130" y="300" class="label-text" text-anchor="start">5. 線粒體</text>
-                                <line x1="-50" y1="295" x2="90" y2="295" class="connector-line" />
+                                <text id="label-plant-mitochondrion" x="-190" y="300" class="label-text" text-anchor="start">5. 線粒體</text>
+                                <!-- Line extended left to -50 -->
+                                <line x1="-50" y1="295" x2="110" y2="295" class="connector-line" />
                             </g>
                             <!-- 6. Chloroplasts -->
                             <g id="plant-chloroplast" class="hover-part" onclick="selectPart('chloroplast')">
@@ -151,32 +203,34 @@
                                 <ellipse cx="450" cy="350" rx="16" ry="10" fill="#16a34a" stroke="#14532d" stroke-width="2" transform="rotate(30 450 350)"/>
                                 <ellipse cx="150" cy="330" rx="16" ry="10" fill="#16a34a" stroke="#14532d" stroke-width="2" transform="rotate(-20 150 330)"/>
                                 <ellipse cx="180" cy="90" rx="16" ry="10" fill="#16a34a" stroke="#14532d" stroke-width="2" transform="rotate(10 180 90)"/>
-                                <text id="label-plant-chloroplast" x="-130" y="335" class="label-text" text-anchor="start">6. 葉綠體</text>
+                                <text id="label-plant-chloroplast" x="-190" y="335" class="label-text" text-anchor="start">6. 葉綠體</text>
+                                <!-- Line extended left to -50 -->
                                 <line x1="-50" y1="330" x2="135" y2="330" class="connector-line" />
                             </g>
                         </g>
                     </svg>
                 </div>
 
-                <!-- ANIMAL CELL VIEW (Hidden initially) -->
-                <div id="view-animal" class="w-full h-full flex justify-center items-center hidden">
-                    <svg viewBox="0 0 700 450" class="w-full h-full max-w-4xl select-none" preserveAspectRatio="xMidYMid meet">
-                        <g transform="translate(140, 0)">
+                <!-- ANIMAL CELL VIEW -->
+                <div id="view-animal" class="w-full h-full flex justify-center items-center hidden transition-opacity duration-300">
+                    <svg viewBox="0 0 800 450" class="w-full h-full max-w-5xl select-none" preserveAspectRatio="xMidYMid meet">
+                        <g transform="translate(200, 0)">
                             
                             <!-- 1. Cell Membrane (Irregular Shape) -->
                             <g id="animal-cell-membrane" class="hover-part" onclick="selectPart('cell-membrane')">
-                                <!-- Irregular oval/blob -->
                                 <path d="M100,150 Q80,50 250,60 Q400,30 480,100 Q550,150 520,280 Q480,380 300,390 Q120,400 100,280 Q80,200 100,150 Z" 
                                       fill="#ffe4e6" stroke="#fbbf24" stroke-width="3" />
-                                <text id="label-animal-cell-membrane" x="-130" y="100" class="label-text" text-anchor="start">1. 細胞膜</text>
-                                <line x1="-50" y1="95" x2="150" y2="95" class="connector-line" />
+                                <text id="label-animal-cell-membrane" x="-190" y="150" class="label-text" text-anchor="start">1. 細胞膜</text>
+                                <!-- Line extended left to -50 -->
+                                <line x1="-50" y1="145" x2="100" y2="145" class="connector-line" />
                             </g>
 
                             <!-- 2. Cytoplasm (Inside click) -->
                             <g id="animal-cytoplasm" class="hover-part" onclick="selectPart('cytoplasm')">
                                 <path d="M105,155 Q85,55 250,65 Q400,35 480,105 Q550,155 520,280 Q480,375 300,385 Q120,395 105,280 Q85,200 105,155 Z" 
                                       fill="transparent" />
-                                <text id="label-animal-cytoplasm" x="-130" y="350" class="label-text" text-anchor="start">4. 細胞質</text>
+                                <text id="label-animal-cytoplasm" x="-190" y="350" class="label-text" text-anchor="start">4. 細胞質</text>
+                                <!-- Line extended left to -50 -->
                                 <line x1="-50" y1="345" x2="200" y2="345" class="connector-line" />
                             </g>
 
@@ -184,7 +238,8 @@
                             <g id="animal-nucleus" class="hover-part" onclick="selectPart('nucleus')">
                                 <circle cx="300" cy="225" r="45" fill="#e9d5ff" stroke="#9333ea" stroke-width="3" />
                                 <circle cx="300" cy="225" r="12" fill="#9333ea" opacity="0.5" />
-                                <text id="label-animal-nucleus" x="-130" y="225" class="label-text" text-anchor="start">2. 細胞核</text>
+                                <text id="label-animal-nucleus" x="-190" y="225" class="label-text" text-anchor="start">2. 細胞核</text>
+                                <!-- Line extended left to -50 -->
                                 <line x1="-50" y1="220" x2="255" y2="220" class="connector-line" />
                             </g>
 
@@ -199,133 +254,258 @@
                                 <!-- Left (Target for Label) -->
                                 <g transform="translate(180, 280) scale(0.8) rotate(-45)"><path d="M0,0 Q20,-20 40,0 Q20,20 0,0" fill="#fca5a5" stroke="#ef4444" stroke-width="3" /><path d="M5,0 L35,0" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3" fill="none" /></g>
 
-                                <text id="label-animal-mitochondrion" x="-130" y="280" class="label-text" text-anchor="start">3. 線粒體</text>
-                                <line x1="-50" y1="275" x2="175" y2="275" class="connector-line" />
+                                <text id="label-animal-mitochondrion" x="-190" y="280" class="label-text" text-anchor="start">3. 線粒體</text>
+                                <!-- Line extended left to -50 -->
+                                <line x1="-50" y1="275" x2="195" y2="275" class="connector-line" />
                             </g>
 
                         </g>
                     </svg>
                 </div>
-
             </div>
 
-            <!-- Right Column: Info Panel -->
-            <div class="w-full md:w-2/5 h-1/2 md:h-full bg-emerald-50 p-6 overflow-y-auto shadow-inner flex flex-col">
+            <!-- 2. Floating Info Panel (Bottom Right) -->
+            <!-- Use pointer-events-none on wrapper to allow clicking SVG behind the empty space -->
+            <div class="absolute bottom-0 left-0 right-0 md:left-auto md:top-auto md:bottom-6 md:right-6 md:w-96 max-h-[45vh] md:max-h-[80vh] z-30 flex flex-col pointer-events-none transition-all duration-300">
                 
-                <div id="info-card" class="bg-white rounded-2xl shadow-xl p-6 border-t-4 border-emerald-500 transition-all duration-300">
-                    <!-- Default State -->
-                    <div id="default-state" class="text-center py-8 text-gray-500">
-                        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                        <p class="text-xl font-bold">請點擊左側標示或構造</p>
-                        <p class="mt-2 text-sm">點選構造名稱，查看它的功能。</p>
-                    </div>
-
-                    <!-- Active State (Hidden by default) -->
-                    <div id="active-state" class="hidden">
-                        <div class="flex items-center justify-between mb-4 border-b pb-2">
-                            <h2 id="part-title" class="text-3xl font-black text-emerald-800 tracking-wider">構造名稱</h2>
-                            <span id="part-icon" class="text-4xl">🔬</span>
-                        </div>
+                <!-- Inner card takes pointer events -->
+                <div class="pointer-events-auto bg-white/95 backdrop-blur-md shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] md:shadow-2xl rounded-t-2xl md:rounded-2xl border border-gray-200/50 flex flex-col h-full overflow-hidden transition-all duration-300">
+                    
+                    <div class="p-6 overflow-y-auto custom-scrollbar">
                         
-                        <div class="space-y-4">
-                            <div class="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
-                                <h3 class="text-sm font-bold text-blue-600 uppercase mb-1">構造特徵 (Structure)</h3>
-                                <p id="part-structure" class="text-gray-800 text-lg leading-relaxed">...</p>
+                        <div id="info-card" class="transition-all duration-300">
+                            <!-- Default State -->
+                            <div id="default-state" class="text-center py-6 text-gray-500">
+                                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                <p id="default-title" class="text-lg font-bold">請點擊左側標示或構造</p>
+                                <p id="default-subtitle" class="mt-1 text-sm">點選構造名稱，查看它的功能。</p>
                             </div>
 
-                            <div class="bg-orange-50 p-4 rounded-xl border-l-4 border-orange-500">
-                                <h3 class="text-sm font-bold text-orange-600 uppercase mb-1">功能 (Function)</h3>
-                                <p id="part-function" class="text-gray-800 text-lg leading-relaxed">...</p>
-                            </div>
+                            <!-- Active State (Hidden by default) -->
+                            <div id="active-state" class="hidden">
+                                <div class="flex items-center justify-between mb-4 border-b pb-2">
+                                    <h2 id="part-title" class="text-2xl font-black text-emerald-800 tracking-wider">構造名稱</h2>
+                                    <span id="part-icon" class="text-4xl">🔬</span>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <div class="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
+                                        <h3 id="header-structure" class="text-sm font-bold text-blue-600 uppercase mb-1">構造特徵 (Structure)</h3>
+                                        <p id="part-structure" class="text-gray-800 text-base leading-relaxed">...</p>
+                                    </div>
 
-                            <div class="mt-4 pt-4 border-t border-gray-100">
-                                <p id="part-analogy" class="text-sm text-gray-500 italic">
-                                    💡 比喻：<span id="analogy-text">...</span>
-                                </p>
+                                    <div class="bg-orange-50 p-4 rounded-xl border-l-4 border-orange-500">
+                                        <h3 id="header-function" class="text-sm font-bold text-orange-600 uppercase mb-1">功能 (Function)</h3>
+                                        <p id="part-function" class="text-gray-800 text-base leading-relaxed">...</p>
+                                    </div>
+
+                                    <div class="mt-4 pt-4 border-t border-gray-100">
+                                        <p class="text-sm text-gray-500 italic">
+                                            <span id="header-analogy">💡 比喻：</span><span id="analogy-text">...</span>
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Quick Legend for Mobile (Auto-generated by JS in this version) -->
-                <div id="mobile-legend" class="mt-6 grid grid-cols-2 gap-2 md:hidden">
-                    <!-- Populated by JS -->
+                        <!-- Quick Legend for Mobile (Hidden on desktop since we have floating panel) -->
+                        <div id="mobile-legend" class="mt-6 grid grid-cols-2 gap-2 md:hidden">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
+
         </main>
     </div>
 
+    <!-- COMPARISON MODAL -->
+    <div id="compare-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex justify-center items-center p-4 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col transform transition-transform duration-300 scale-100">
+            <!-- Modal Header -->
+            <div class="bg-emerald-600 text-white p-4 flex justify-between items-center shadow-md">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">📊</span>
+                    <h2 id="modal-title" class="text-xl md:text-2xl font-bold">植物細胞 vs 動物細胞</h2>
+                </div>
+                <button onclick="closeModal()" class="text-white hover:bg-emerald-700 p-1 rounded-full w-8 h-8 flex items-center justify-center font-bold text-xl transition-colors">&times;</button>
+            </div>
+            
+            <!-- Modal Content (Scrollable) -->
+            <div class="p-6 overflow-y-auto bg-gray-50">
+                <table class="w-full compare-table text-sm md:text-base bg-white shadow-sm rounded-lg overflow-hidden">
+                    <thead>
+                        <tr>
+                            <th id="th-feature" class="w-1/3 text-left">構造 / 特徵</th>
+                            <th id="th-plant" class="w-1/3 text-emerald-800">🌱 植物細胞</th>
+                            <th id="th-animal" class="w-1/3 text-orange-800">🦁 動物細胞</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-tbody" class="text-gray-700">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+                <div class="mt-4 text-center text-sm text-gray-500">
+                    <span id="modal-tip">💡 提示：植物細胞的細胞壁、葉綠體和大液泡是與動物細胞區別的主要特徵。</span>
+                </div>
+                <div class="mt-6 flex justify-center">
+                    <button id="modal-close-btn" onclick="closeModal()" class="px-6 py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Data Store
-        const dataStore = {
+        // --- Internationalization (i18n) Data ---
+        let currentLang = 'zh'; // 'zh' or 'en'
+
+        const uiTranslations = {
+            zh: {
+                appTitle: "細胞構造探索", // Keep original name as previously adjusted, user asked to change title in previous prompt to "細胞構造 Structure of Cell"
+                appTitle: "細胞結構 Structure of Cell", // Updated per previous specific request
+                levelBadge: "中一科學級別",
+                btnCompare: "比較圖表",
+                navPlant: "植物細胞",
+                navAnimal: "動物細胞",
+                hintBubble: "👆 點擊標示或構造以查看",
+                defaultTitle: "請點擊左側標示或構造",
+                defaultSubtitle: "點選構造名稱，查看它的功能。",
+                headerStructure: "構造特徵 (Structure)",
+                headerFunction: "功能 (Function)",
+                headerAnalogy: "💡 比喻：",
+                modalTitle: "植物細胞 vs 動物細胞",
+                thFeature: "構造 / 特徵",
+                thPlant: "🌱 植物細胞",
+                thAnimal: "🦁 動物細胞",
+                modalTip: "💡 提示：植物細胞的細胞壁、葉綠體和大液泡是與動物細胞區別的主要特徵。",
+                modalClose: "關閉",
+                svgLabels: {
+                    'plant-cell-wall': "1. 細胞壁",
+                    'plant-cell-membrane': "2. 細胞膜",
+                    'plant-cytoplasm': "7. 細胞質",
+                    'plant-vacuole': "4. 液泡",
+                    'plant-nucleus': "3. 細胞核",
+                    'plant-mitochondrion': "5. 線粒體",
+                    'plant-chloroplast': "6. 葉綠體",
+                    'animal-cell-membrane': "1. 細胞膜",
+                    'animal-cytoplasm': "4. 細胞質",
+                    'animal-nucleus': "2. 細胞核",
+                    'animal-mitochondrion': "3. 線粒體"
+                },
+                tableRows: [
+                    { feature: "1. 形狀", plant: "規則且固定", animal: "不規則" },
+                    { feature: "2. 細胞壁", plant: "✓ 有", animal: "✗ 無" },
+                    { feature: "3. 葉綠體", plant: "✓ 有", animal: "✗ 無" },
+                    { feature: "4. 液泡", plant: "✓ 有 (大而位於中央)", animal: "✗ 無 (或極小且暫時性)" },
+                    { feature: "5. 細胞膜", plant: "✓ 有", animal: "✓ 有" },
+                    { feature: "6. 細胞質", plant: "✓ 有", animal: "✓ 有" },
+                    { feature: "7. 細胞核", plant: "✓ 有 (通常在邊緣)", animal: "✓ 有 (通常在中央)" },
+                    { feature: "8. 線粒體", plant: "✓ 有", animal: "✓ 有" }
+                ]
+            },
+            en: {
+                appTitle: "Structure of Cell",
+                levelBadge: "S1 Science Level",
+                btnCompare: "Comparison",
+                navPlant: "Plant Cell",
+                navAnimal: "Animal Cell",
+                hintBubble: "👆 Click labels or structures to view",
+                defaultTitle: "Select a structure",
+                defaultSubtitle: "Click on a part name to see its function.",
+                headerStructure: "Structure",
+                headerFunction: "Function",
+                headerAnalogy: "💡 Analogy: ",
+                modalTitle: "Plant Cell vs Animal Cell",
+                thFeature: "Feature",
+                thPlant: "🌱 Plant Cell",
+                thAnimal: "🦁 Animal Cell",
+                modalTip: "💡 Tip: Cell wall, chloroplasts, and large vacuole are key differences.",
+                modalClose: "Close",
+                svgLabels: {
+                    'plant-cell-wall': "1. Cell Wall",
+                    'plant-cell-membrane': "2. Cell Membrane",
+                    'plant-cytoplasm': "7. Cytoplasm",
+                    'plant-vacuole': "4. Vacuole",
+                    'plant-nucleus': "3. Nucleus",
+                    'plant-mitochondrion': "5. Mitochondrion",
+                    'plant-chloroplast': "6. Chloroplast",
+                    'animal-cell-membrane': "1. Cell Membrane",
+                    'animal-cytoplasm': "4. Cytoplasm",
+                    'animal-nucleus': "2. Nucleus",
+                    'animal-mitochondrion': "3. Mitochondrion"
+                },
+                tableRows: [
+                    { feature: "1. Shape", plant: "Regular & Fixed", animal: "Irregular" },
+                    { feature: "2. Cell Wall", plant: "✓ Present", animal: "✗ Absent" },
+                    { feature: "3. Chloroplasts", plant: "✓ Present", animal: "✗ Absent" },
+                    { feature: "4. Vacuole", plant: "✓ Present (Large & Central)", animal: "✗ Absent (or very small)" },
+                    { feature: "5. Cell Membrane", plant: "✓ Present", animal: "✓ Present" },
+                    { feature: "6. Cytoplasm", plant: "✓ Present", animal: "✓ Present" },
+                    { feature: "7. Nucleus", plant: "✓ Present (Usually at side)", animal: "✓ Present (Usually central)" },
+                    { feature: "8. Mitochondrion", plant: "✓ Present", animal: "✓ Present" }
+                ]
+            }
+        };
+
+        // Scientific Data Store (Bilingual)
+        const scientificData = {
             plant: {
                 'cell-wall': {
-                    name: '細胞壁 (Cell Wall)', icon: '🧱',
-                    structure: '位於植物細胞最外層，厚而堅硬，主要由纖維素組成。',
-                    function: '保護細胞並提供支撐，維持細胞形狀。',
-                    analogy: '就像是學校的圍牆。'
+                    icon: '🧱',
+                    zh: { name: '細胞壁 (Cell Wall)', structure: '位於植物細胞最外層，厚而堅硬，主要由纖維素組成。', function: '保護細胞並提供支撐，維持細胞形狀。', analogy: '就像是學校的圍牆。' },
+                    en: { name: 'Cell Wall', structure: 'Outermost layer of plant cells. Thick and rigid, made of cellulose.', function: 'Protects and supports the cell, maintaining its shape.', analogy: 'Like the school fence/walls.' }
                 },
                 'cell-membrane': {
-                    name: '細胞膜 (Cell Membrane)', icon: '🛡️',
-                    structure: '緊貼在細胞壁內側的一層薄膜。具選擇性透性。',
-                    function: '控制物質進出細胞，將細胞與外界隔開。',
-                    analogy: '就像是學校的校門及保安。'
+                    icon: '🛡️',
+                    zh: { name: '細胞膜 (Cell Membrane)', structure: '緊貼在細胞壁內側的一層薄膜。具選擇性透性。', function: '控制物質進出細胞，將細胞與外界隔開。', analogy: '就像是學校的校門及保安。' },
+                    en: { name: 'Cell Membrane', structure: 'Thin layer inside the cell wall. Differentially permeable.', function: 'Controls substance entry/exit, separating cell from outside.', analogy: 'Like the school gate and security guard.' }
                 },
                 'cytoplasm': {
-                    name: '細胞質 (Cytoplasm)', icon: '💧',
-                    structure: '果凍狀物質，含有水、蛋白質等。',
-                    function: '許多化學反應進行的地方。',
-                    analogy: '就像是校園裡的空間。'
+                    icon: '💧',
+                    zh: { name: '細胞質 (Cytoplasm)', structure: '果凍狀物質，含有水、蛋白質等。', function: '許多化學反應進行的地方。', analogy: '就像是校園裡的空間。' },
+                    en: { name: 'Cytoplasm', structure: 'Jelly-like substance containing water and proteins.', function: 'Site where many chemical reactions take place.', analogy: 'Like the open space in the campus.' }
                 },
                 'nucleus': {
-                    name: '細胞核 (Nucleus)', icon: '🧠',
-                    structure: '呈球狀，含有遺傳物質(DNA)。',
-                    function: '控制細胞活動，並帶有遺傳訊息。',
-                    analogy: '就像是校長室或大腦。'
+                    icon: '🧠',
+                    zh: { name: '細胞核 (Nucleus)', structure: '呈球狀，含有遺傳物質(DNA)。', function: '控制細胞活動，並帶有遺傳訊息。', analogy: '就像是校長室或大腦。' },
+                    en: { name: 'Nucleus', structure: 'Spherical shape, contains genetic material (DNA).', function: 'Controls cell activities and carries genetic information.', analogy: 'Like the Principal\'s office or brain.' }
                 },
                 'chloroplast': {
-                    name: '葉綠體 (Chloroplast)', icon: '☀️',
-                    structure: '綠色顆粒狀，含有葉綠素。',
-                    function: '進行光合作用，製造食物。',
-                    analogy: '就像是食堂廚房。'
+                    icon: '☀️',
+                    zh: { name: '葉綠體 (Chloroplast)', structure: '綠色顆粒狀，含有葉綠素。', function: '進行光合作用，製造食物。', analogy: '就像是食堂廚房。' },
+                    en: { name: 'Chloroplast', structure: 'Green granules containing chlorophyll.', function: 'Conducts photosynthesis to make food.', analogy: 'Like the canteen kitchen.' }
                 },
                 'vacuole': {
-                    name: '液泡 (Vacuole)', icon: '🎈',
-                    structure: '植物細胞通常有一個中央大液泡，含細胞液。',
-                    function: '儲存水分和物質，提供支撐。',
-                    analogy: '就像是大型儲水庫。'
+                    icon: '🎈',
+                    zh: { name: '液泡 (Vacuole)', structure: '植物細胞通常有一個中央大液泡，含細胞液。', function: '儲存水分和物質，提供支撐。', analogy: '就像是大型儲水庫。' },
+                    en: { name: 'Vacuole', structure: 'Large central vacuole containing cell sap.', function: 'Stores water and substances, provides support (turgidity).', analogy: 'Like a large water reservoir.' }
                 },
                 'mitochondrion': {
-                    name: '線粒體 (Mitochondrion)', icon: '🔋',
-                    structure: '細小的棒狀構造。',
-                    function: '進行呼吸作用，釋放能量。「細胞發電廠」。',
-                    analogy: '就像是發電機房。'
+                    icon: '🔋',
+                    zh: { name: '線粒體 (Mitochondrion)', structure: '細小的棒狀構造。', function: '進行呼吸作用，釋放能量。「細胞發電廠」。', analogy: '就像是發電機房。' },
+                    en: { name: 'Mitochondrion', structure: 'Small rod-shaped structures.', function: 'Conducts respiration to release energy. "Powerhouse".', analogy: 'Like the power generator room.' }
                 }
             },
             animal: {
                 'cell-membrane': {
-                    name: '細胞膜 (Cell Membrane)', icon: '🛡️',
-                    structure: '位於動物細胞最外層的薄膜。具選擇性透性。',
-                    function: '控制物質進出，包圍細胞質。',
-                    analogy: '就像是皮膚或邊境檢查站。'
+                    icon: '🛡️',
+                    zh: { name: '細胞膜 (Cell Membrane)', structure: '位於動物細胞最外層的薄膜。具選擇性透性。', function: '控制物質進出，包圍細胞質。', analogy: '就像是皮膚或邊境檢查站。' },
+                    en: { name: 'Cell Membrane', structure: 'Outermost layer of animal cells. Differentially permeable.', function: 'Controls entry/exit, encloses cytoplasm.', analogy: 'Like skin or border checkpoint.' }
                 },
                 'cytoplasm': {
-                    name: '細胞質 (Cytoplasm)', icon: '💧',
-                    structure: '果凍狀物質，填滿細胞內部。',
-                    function: '提供化學反應的場所，承載細胞器。',
-                    analogy: '就像是充滿水的果凍。'
+                    icon: '💧',
+                    zh: { name: '細胞質 (Cytoplasm)', structure: '果凍狀物質，填滿細胞內部。', function: '提供化學反應的場所，承載細胞器。', analogy: '就像是充滿水的果凍。' },
+                    en: { name: 'Cytoplasm', structure: 'Jelly-like substance filling the cell.', function: 'Site for chemical reactions, holds organelles.', analogy: 'Like jelly filled with water.' }
                 },
                 'nucleus': {
-                    name: '細胞核 (Nucleus)', icon: '🧠',
-                    structure: '通常位於細胞中央，含有遺傳物質。',
-                    function: '控制細胞生長和修復，含有DNA。',
-                    analogy: '就像是指揮中心。'
+                    icon: '🧠',
+                    zh: { name: '細胞核 (Nucleus)', structure: '通常位於細胞中央，含有遺傳物質。', function: '控制細胞生長和修復，含有DNA。', analogy: '就像是指揮中心。' },
+                    en: { name: 'Nucleus', structure: 'Usually central, contains genetic material.', function: 'Controls growth and repair, contains DNA.', analogy: 'Like a command center.' }
                 },
                 'mitochondrion': {
-                    name: '線粒體 (Mitochondrion)', icon: '🔋',
-                    structure: '散佈在細胞質中的棒狀構造。',
-                    function: '釋放能量供細胞活動使用。',
-                    analogy: '就像是電池。'
+                    icon: '🔋',
+                    zh: { name: '線粒體 (Mitochondrion)', structure: '散佈在細胞質中的棒狀構造。', function: '釋放能量供細胞活動使用。', analogy: '就像是電池。' },
+                    en: { name: 'Mitochondrion', structure: 'Rod-shaped, scattered in cytoplasm.', function: 'Releases energy for cell activities.', analogy: 'Like batteries.' }
                 }
             }
         };
@@ -333,20 +513,100 @@
         let currentMode = 'plant'; // 'plant' or 'animal'
         let currentSelectedId = null;
 
+        // --- Logic ---
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            updateUI();
+        }
+
+        function updateUI() {
+            const t = uiTranslations[currentLang];
+
+            // Header & Static UI
+            document.getElementById('app-title').innerText = t.appTitle;
+            document.getElementById('btn-compare-text').innerText = t.btnCompare;
+            document.getElementById('nav-plant-text').innerText = t.navPlant;
+            document.getElementById('nav-animal-text').innerText = t.navAnimal;
+            document.getElementById('hint-bubble').innerText = t.hintBubble;
+            // document.getElementById('lang-btn-text').innerText = currentLang === 'zh' ? 'EN' : '中'; // Removed dynamic text update
+            
+            // Info Card Static Text
+            document.getElementById('default-title').innerText = t.defaultTitle;
+            document.getElementById('default-subtitle').innerText = t.defaultSubtitle;
+            document.getElementById('header-structure').innerText = t.headerStructure;
+            document.getElementById('header-function').innerText = t.headerFunction;
+            document.getElementById('header-analogy').innerText = t.headerAnalogy;
+            
+            // Modal Static Text
+            document.getElementById('modal-title').innerText = t.modalTitle;
+            document.getElementById('th-feature').innerText = t.thFeature;
+            document.getElementById('th-plant').innerText = t.thPlant;
+            document.getElementById('th-animal').innerText = t.thAnimal;
+            document.getElementById('modal-tip').innerText = t.modalTip;
+            document.getElementById('modal-close-btn').innerText = t.modalClose;
+
+            // Update SVG Labels
+            Object.keys(t.svgLabels).forEach(id => {
+                const labelEl = document.getElementById('label-' + id);
+                if(labelEl) labelEl.textContent = t.svgLabels[id];
+            });
+
+            // Update Modal Table Content
+            updateModalTable();
+
+            // Refresh Info Card if something is selected
+            if (currentSelectedId) {
+                selectPart(currentSelectedId); // Re-render current selection with new lang
+            } else {
+                renderMobileLegend(); // Refresh names in legend
+            }
+        }
+
+        function updateModalTable() {
+            const t = uiTranslations[currentLang];
+            const tbody = document.getElementById('modal-tbody');
+            tbody.innerHTML = '';
+
+            t.tableRows.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 1 ? 'bg-gray-50' : '';
+                tr.innerHTML = `
+                    <td class="font-bold border border-gray-200 p-3">${row.feature}</td>
+                    <td class="border border-gray-200 p-3">${formatCheck(row.plant)}</td>
+                    <td class="border border-gray-200 p-3">${formatCheck(row.animal)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function formatCheck(text) {
+            // Helper to style check/cross marks
+            return text.replace('✓', '<span class="check-icon">✓</span>')
+                       .replace('✗', '<span class="cross-icon">✗</span>');
+        }
+
         function switchMode(mode) {
             currentMode = mode;
             currentSelectedId = null;
 
-            // 1. Toggle UI Buttons
-            document.getElementById('btn-plant').classList.toggle('nav-active', mode === 'plant');
-            document.getElementById('btn-plant').classList.toggle('text-white', mode === 'plant');
-            document.getElementById('btn-plant').classList.toggle('text-gray-400', mode !== 'plant');
+            // UI Toggle
+            const btnPlant = document.getElementById('btn-plant');
+            const btnAnimal = document.getElementById('btn-animal');
 
-            document.getElementById('btn-animal').classList.toggle('nav-active', mode === 'animal');
-            document.getElementById('btn-animal').classList.toggle('text-white', mode === 'animal');
-            document.getElementById('btn-animal').classList.toggle('text-gray-400', mode !== 'animal');
+            if (mode === 'plant') {
+                btnPlant.classList.add('nav-active');
+                btnPlant.classList.remove('text-gray-400');
+                btnAnimal.classList.remove('nav-active');
+                btnAnimal.classList.add('text-gray-400');
+            } else {
+                btnAnimal.classList.add('nav-active');
+                btnAnimal.classList.remove('text-gray-400');
+                btnPlant.classList.remove('nav-active');
+                btnPlant.classList.add('text-gray-400');
+            }
 
-            // 2. Toggle SVG Views
+            // View Toggle
             if (mode === 'plant') {
                 document.getElementById('view-plant').classList.remove('hidden');
                 document.getElementById('view-animal').classList.add('hidden');
@@ -355,91 +615,104 @@
                 document.getElementById('view-animal').classList.remove('hidden');
             }
 
-            // 3. Reset Info Panel
+            // Reset Info
             document.getElementById('default-state').classList.remove('hidden');
             document.getElementById('active-state').classList.add('hidden');
 
-            // 4. Update Mobile Legend
             renderMobileLegend();
         }
 
         function selectPart(partId) {
-            // Determine which prefix to use based on current mode for ID lookup
-            const prefix = currentMode + '-'; // e.g., 'plant-' or 'animal-'
-
-            // 1. Update Visuals
-            // Clear previous selection
+            const prefix = currentMode + '-';
+            
+            // Visual Updates
             document.querySelectorAll('.selected-part').forEach(el => el.classList.remove('selected-part'));
             document.querySelectorAll('.selected-text').forEach(el => el.classList.remove('selected-text'));
 
-            // Select SVG Shape
             const targetShape = document.getElementById(prefix + partId);
             if (targetShape) targetShape.classList.add('selected-part');
 
-            // Select Label Text
             const targetLabel = document.getElementById('label-' + prefix + partId);
             if (targetLabel) targetLabel.classList.add('selected-text');
 
             currentSelectedId = partId;
 
-            // 2. Get Data
-            const data = dataStore[currentMode][partId];
-            if (!data) return;
+            // Data Retrieval
+            const dataItem = scientificData[currentMode][partId];
+            if (!dataItem) return;
 
-            // 3. Speech Synthesis
+            const content = dataItem[currentLang]; // Get content based on current lang
+
+            // Speech Synthesis (Always read English name, or localized?)
+            // User requested: "English name" specifically in previous turn.
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                const enNameMatch = data.name.match(/\(([^)]+)\)/);
-                if (enNameMatch) {
-                    const utterance = new SpeechSynthesisUtterance(enNameMatch[1]);
-                    utterance.lang = 'en-US';
-                    utterance.rate = 0.8;
-                    window.speechSynthesis.speak(utterance);
-                }
+                // Always get the English name for speech regardless of UI language
+                const englishNameForSpeech = scientificData[currentMode][partId]['en'].name;
+                const utterance = new SpeechSynthesisUtterance(englishNameForSpeech);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.8;
+                window.speechSynthesis.speak(utterance);
             }
 
-            // 4. Update Info Panel
-            const defaultState = document.getElementById('default-state');
-            const activeState = document.getElementById('active-state');
-            
-            defaultState.classList.add('hidden');
-            activeState.classList.remove('hidden');
+            // Update Info Panel
+            document.getElementById('default-state').classList.add('hidden');
+            document.getElementById('active-state').classList.remove('hidden');
             
             const infoCard = document.getElementById('info-card');
             infoCard.classList.remove('fade-in');
-            void infoCard.offsetWidth; // trigger reflow
+            void infoCard.offsetWidth;
             infoCard.classList.add('fade-in');
 
-            document.getElementById('part-title').innerText = data.name;
-            document.getElementById('part-icon').innerText = data.icon;
-            document.getElementById('part-structure').innerText = data.structure;
-            document.getElementById('part-function').innerText = data.function;
-            document.getElementById('analogy-text').innerText = data.analogy;
+            document.getElementById('part-title').innerText = content.name;
+            document.getElementById('part-icon').innerText = dataItem.icon;
+            document.getElementById('part-structure').innerText = content.structure;
+            document.getElementById('part-function').innerText = content.function;
+            document.getElementById('analogy-text').innerText = content.analogy;
 
-            // Scroll for mobile
             if (window.innerWidth < 768) {
-                activeState.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // For mobile bottom sheet behavior
+                // No scroll needed as it's fixed at bottom, but maybe bring focus
             }
         }
 
         function renderMobileLegend() {
             const container = document.getElementById('mobile-legend');
-            container.innerHTML = ''; // Clear
+            container.innerHTML = ''; 
             
-            const currentData = dataStore[currentMode];
+            const currentData = scientificData[currentMode];
             Object.keys(currentData).forEach(key => {
                 const item = currentData[key];
+                const content = item[currentLang];
                 const btn = document.createElement('button');
                 btn.className = "p-2 bg-white rounded shadow text-xs font-bold text-gray-700 border border-gray-200 truncate";
-                // Get short name (first part before bracket)
-                const shortName = item.name.split(' (')[0];
+                // Simplified name for legend
+                const shortName = content.name.split(' (')[0]; 
                 btn.innerText = shortName;
                 btn.onclick = () => selectPart(key);
                 container.appendChild(btn);
             });
         }
 
-        // Init
+        function openModal() {
+            updateModalTable(); // Ensure table is up to date with lang
+            const modal = document.getElementById('compare-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('compare-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        document.getElementById('compare-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Initialize table and mobile legend on load
+        updateModalTable();
         renderMobileLegend();
     </script>
 </body>

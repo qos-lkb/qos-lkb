@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氣體分子動力論模擬 (Maxwell-Boltzmann)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- MathJax for LaTeX support -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+
+    <!-- Three.js Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a202c; color: white; }
+        canvas { display: block; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2d3748; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.9); pointer-events: none; }
+        .modal-enter-active { opacity: 1; transform: scale(1); pointer-events: auto; transition: all 0.2s ease-out; }
+        .modal-exit { opacity: 1; transform: scale(1); pointer-events: auto; }
+        .modal-exit-active { opacity: 0; transform: scale(0.9); pointer-events: none; transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="flex flex-col h-screen font-sans">
+
+    <!-- Header -->
+    <header class="bg-gray-800 p-3 shadow-md z-10 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-blue-400" data-i18n="title">理想氣體分子模擬</h1>
+                <p class="text-xs text-gray-400 hidden sm:block" data-i18n="subtitle">微觀碰撞 vs 巨觀速率分佈</p>
+            </div>
+        </div>
+
+        <!-- Right Buttons -->
+        <div class="flex gap-2">
+            <button id="theoryBtn" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition" data-i18n="theoryBtn">原理解說</button>
+            <button id="langBtn" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium transition border border-gray-500">中 / EN</button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden flex-col lg:flex-row relative">
+        
+        <!-- Left: 3D Simulation -->
+        <div id="canvas-container" class="relative w-full lg:w-3/5 h-3/5 lg:h-full bg-black border-b lg:border-b-0 lg:border-r border-gray-700">
+            <!-- Info Overlay -->
+            <div class="absolute top-2 left-2 bg-black/70 backdrop-blur-sm p-4 rounded-lg text-sm text-gray-300 pointer-events-none select-none z-10 border border-gray-600 shadow-lg min-w-[200px]">
+                <div class="space-y-2">
+                    <p class="border-b border-gray-600 pb-1 mb-1 font-semibold text-gray-400">系統狀態 (Real Units)</p>
+                    <p><span data-i18n="volume">體積 \(V\)</span>: <span class="text-blue-300 font-mono text-base ml-1">24000</span> cm³</p>
+                    <p><span data-i18n="particleCount">粒子數</span>: <span class="text-white font-mono text-base ml-1">1000</span> (sim)</p>
+                    <p>
+                        <span data-i18n="pressure">氣壓 \(P\)</span>: 
+                        <span id="pressureDisplay" class="text-yellow-400 font-mono text-xl ml-1">--</span> Pa
+                    </p>
+                    <p>
+                        <span data-i18n="avgSpeed">方均根速率 \(v_{rms}\)</span>: 
+                        <span id="avgSpeedDisplay" class="text-green-400 font-mono text-base ml-1">--</span> \(m\ s^{-1}\)
+                    </p>
+                </div>
+                <div class="mt-3 pt-2 border-t border-gray-600 text-xs text-gray-500">
+                    <span data-i18n="controlTip">左鍵旋轉 / 滾輪縮放</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Statistics & Controls -->
+        <div class="w-full lg:w-2/5 h-2/5 lg:h-full bg-gray-900 p-4 flex flex-col overflow-y-auto">
+            
+            <!-- Controls Section -->
+            <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700 shadow-sm shrink-0">
+                <h3 class="text-sm font-bold text-gray-300 mb-3 border-b border-gray-600 pb-1" data-i18n="controlsTitle">實驗參數設定</h3>
+                
+                <!-- Temp Slider -->
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="tempSlider" class="text-sm font-medium text-orange-400"><span data-i18n="tempLabel">系統溫度 \(T\)</span>:</label>
+                        <span id="tempValue" class="text-sm font-mono text-white bg-gray-700 px-2 py-0.5 rounded">298 K</span>
+                    </div>
+                    <input type="range" id="tempSlider" min="100" max="1000" step="1" value="298" class="w-full accent-orange-500 cursor-pointer h-2 bg-gray-600 rounded-lg appearance-none">
+                </div>
+
+                <!-- Mass Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="massSlider" class="text-sm font-medium text-cyan-400"><span data-i18n="massLabel">摩爾質量 \(M\) (\(kg\ mol^{-1}\))</span>:</label>
+                        <span id="massValue" class="text-sm font-mono text-white bg-gray-700 px-2 py-0.5 rounded">0.0288</span>
+                    </div>
+                    <input type="range" id="massSlider" min="0.002" max="0.1" step="0.0001" value="0.0288" class="w-full accent-cyan-500 cursor-pointer h-2 bg-gray-600 rounded-lg appearance-none">
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-1 px-1">
+                        <span>H₂ (0.002)</span>
+                        <span>Air (0.029)</span>
+                        <span>Heavy (0.1)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Section -->
+            <h2 class="text-lg font-semibold mb-2 text-center text-gray-200 shrink-0" data-i18n="chartTitle">速率分佈 (Maxwell-Boltzmann)</h2>
+            <div class="relative flex-1 min-h-[200px] w-full">
+                <canvas id="speedChart"></canvas>
+            </div>
+            <div class="mt-2 text-xs text-gray-400 text-center shrink-0">
+                <span data-i18n="chartX">X軸: 速率 (\(m\ s^{-1}\))</span> | <span data-i18n="chartY">Y軸: 分子數量 (固定最大值 25%)</span>
+            </div>
+        </div>
+
+        <!-- Theory Modal -->
+        <div id="modalOverlay" class="absolute inset-0 bg-black/80 z-50 flex items-center justify-center modal-enter hidden backdrop-blur-sm">
+            <div class="bg-gray-800 border border-gray-600 rounded-lg p-6 max-w-lg w-[90%] shadow-2xl relative">
+                <button id="closeModal" class="absolute top-3 right-3 text-gray-400 hover:text-white text-xl">&times;</button>
+                <h3 class="text-xl font-bold text-blue-400 mb-4" data-i18n="theoryTitle">物理原理</h3>
+                <div class="text-sm text-gray-300 space-y-3 leading-relaxed h-[60vh] overflow-y-auto pr-2" id="theoryContent">
+                    <!-- Content injected by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Module -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 多語言設定 ---
+        let currentLang = 'zh';
+        const i18n = {
+            zh: {
+                title: "理想氣體分子模擬",
+                subtitle: "微觀碰撞 vs 巨觀速率分佈",
+                controlsTitle: "實驗參數設定",
+                tempLabel: "系統溫度 \\(T\\)",
+                massLabel: "摩爾質量 \\(M\\) (\\(kg\\ mol^{-1}\\))",
+                theoryBtn: "原理解說",
+                particleCount: "粒子數",
+                avgSpeed: "方均根速率 \\(v_{rms}\\)",
+                pressure: "氣壓 \\(P\\)",
+                volume: "體積 \\(V\\)",
+                controlTip: "左鍵旋轉 / 滾輪縮放",
+                chartTitle: "速率分佈 (Maxwell-Boltzmann)",
+                chartX: "X軸: 速率 (\\(m\\ s^{-1}\\))",
+                chartY: "Y軸: 分子數量",
+                theoryTitle: "物理原理：氣體動力論",
+                theoryBody: `
+                    <p><strong>1. 真實物理公式：</strong><br>
+                    本模擬現在使用真實的理想氣體常數 $R = 8.314$ J/(mol·K) 進行計算。
+                    方均根速率公式為：
+                    $$v_{rms} = \\sqrt{\\frac{3RT}{M}}$$
+                    例如：空氣在 298 K 時的 $v_{rms}$ 約為 508 $m\\ s^{-1}$，而氫氣則接近 1900 $m\\ s^{-1}$。</p>
+                    
+                    <p><strong>2. 氣壓 (Pressure)：</strong><br>
+                    我們設定了一個 $24$ 公升 ($0.024 \text{ m}^3$) 的虛擬體積來計算壓力。當 $T=298$ K 時，系統壓力校準為約 $1$ atm ($101325$ Pa)。</p>
+                    
+                    <p><strong>3. 視覺化調整：</strong><br>
+                    由於真實分子的運動速度極快（數百 $m\\ s^{-1}$），為了讓您能看清分子運動，我們在 3D 視圖中對時間進行了慢動作處理，但右側的數據與圖表完全反映真實物理數值。</p>
+                `
+            },
+            en: {
+                title: "Ideal Gas Simulation",
+                subtitle: "Micro Collisions vs Macro Distribution",
+                controlsTitle: "Parameters",
+                tempLabel: "Temperature \\(T\\)",
+                massLabel: "Molar Mass \\(M\\) (\\(kg\\ mol^{-1}\\))",
+                theoryBtn: "Theory",
+                particleCount: "Particles",
+                avgSpeed: "RMS Speed \\(v_{rms}\\)",
+                pressure: "Pressure \\(P\\)",
+                volume: "Volume \\(V\\)",
+                controlTip: "L-Click Rotate / Scroll Zoom",
+                chartTitle: "Speed Distribution",
+                chartX: "X: Speed (\\(m\\ s^{-1}\\))",
+                chartY: "Y: Particle Count",
+                theoryTitle: "Physics: Kinetic Theory",
+                theoryBody: `
+                    <p><strong>1. Real Physics Formula:</strong><br>
+                    The simulation now uses the real Ideal Gas Constant $R = 8.314$ J/(mol·K).
+                    RMS Speed formula:
+                    $$v_{rms} = \\sqrt{\\frac{3RT}{M}}$$
+                    E.g., for Air at 298 K, $v_{rms} \\approx 508$ $m\\ s^{-1}$; for Hydrogen, it's approx 1900 $m\\ s^{-1}$.</p>
+                    
+                    <p><strong>2. Pressure:</strong><br>
+                    We set a virtual volume of $24$ Liters ($0.024 \text{ m}^3$). At $T=298$ K, pressure is calibrated to approx $1$ atm ($101325$ Pa).</p>
+                    
+                    <p><strong>3. Visualization:</strong><br>
+                    Since real molecules move incredibly fast (hundreds of $m\\ s^{-1}$), the 3D view is slowed down (time-dilated) for visibility, but all charts and data reflect real physical values.</p>
+                `
+            }
+        };
+
+        function updateLang() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[currentLang][key]) {
+                    el.innerHTML = i18n[currentLang][key];
+                }
+            });
+            document.getElementById('theoryContent').innerHTML = i18n[currentLang].theoryBody;
+            
+            // Trigger MathJax typeset for the whole document body
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([document.body]);
+            }
+            
+            speedChart.data.datasets[0].label = currentLang === 'zh' ? '分子數量' : 'Particle Count';
+            // Chart.js Canvas title doesn't support MathJax, using unicode as fallback for canvas title,
+            // but the HTML legend below uses MathJax.
+            speedChart.options.scales.x.title.text = currentLang === 'zh' ? '速率 (m s⁻¹)' : 'Speed (m s⁻¹)';
+            speedChart.options.scales.y.title.text = i18n[currentLang].chartY;
+            speedChart.update();
+        }
+
+        // --- 物理參數 ---
+        const PARTICLE_COUNT = 1000;
+        const BOX_SIZE = 40;
+        const HALF_BOX = BOX_SIZE / 2;
+        const PARTICLE_RADIUS = 0.4;
+        
+        // 真實物理常數
+        const R_GAS = 8.314; // J / (mol K)
+        
+        // 初始設定 (Air at STP approx)
+        let targetTemp = 298; 
+        let molarMass = 0.0288; // kg/mol
+        
+        // 物理數據
+        const positions = new Float32Array(PARTICLE_COUNT * 3);
+        const velocities = new Float32Array(PARTICLE_COUNT * 3); // Real m/s
+        const speeds = new Float32Array(PARTICLE_COUNT);
+        
+        const collidingIndices = new Set();
+
+        // --- Chart.js 設定 ---
+        const ctx = document.getElementById('speedChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+        const speedChart = new Chart(ctx, {
+            type: 'line', 
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '分子數量',
+                    data: [],
+                    borderColor: 'rgba(96, 165, 250, 1)', 
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    tension: 0.4, 
+                    fill: true,   
+                    pointRadius: 0 
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    x: {
+                        title: { display: true, text: '速率 (m s⁻¹)', color: '#9ca3af' },
+                        ticks: { color: '#9ca3af', maxTicksLimit: 8 },
+                        grid: { color: '#374151' }
+                    },
+                    y: {
+                        display: true, 
+                        beginAtZero: true,
+                        max: PARTICLE_COUNT * 0.25,
+                        title: { display: true, text: 'N', color: '#9ca3af' },
+                        ticks: { color: '#9ca3af' },
+                        grid: { color: '#374151', display: false } 
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // --- Three.js 初始化 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 500);
+        camera.position.set(80, 60, 80); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.3;
+
+        scene.add(new THREE.AmbientLight(0x404040));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(20, 50, 20);
+        scene.add(dirLight);
+
+        const boxGeo = new THREE.BoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE);
+        const edges = new THREE.EdgesGeometry(boxGeo);
+        const boxMat = new THREE.LineBasicMaterial({ color: 0x555555 });
+        scene.add(new THREE.LineSegments(edges, boxMat));
+
+        const sphereGeo = new THREE.SphereGeometry(PARTICLE_RADIUS, 8, 8);
+        const sphereMat = new THREE.MeshPhongMaterial({ color: 0xffaa00, shininess: 100 });
+        const particlesMesh = new THREE.InstancedMesh(sphereGeo, sphereMat, PARTICLE_COUNT);
+        scene.add(particlesMesh);
+
+        const dummy = new THREE.Object3D();
+        const color = new THREE.Color();
+
+        // --- 物理引擎 ---
+
+        function initPhysics() {
+            // 初始化 Chart labels (0 - 3000 m/s)
+            // 氫氣 v_rms 約 1900，所以範圍需要很大
+            const maxSpeedChart = 3000; 
+            const binCount = 60; // 50 m/s per bin
+            speedChart.data.labels = [];
+            speedChart.data.datasets[0].data = [];
+            for(let i=0; i<binCount; i++) {
+                speedChart.data.labels.push(((i/binCount)*maxSpeedChart).toFixed(0));
+                speedChart.data.datasets[0].data.push(0);
+            }
+
+            // 初始化位置和速度
+            // Box-Muller 產生常態分佈，並縮放到約略的目標 v_rms
+            const initial_v_rms = Math.sqrt((3 * R_GAS * targetTemp) / molarMass);
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * BOX_SIZE * 0.9;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * BOX_SIZE * 0.9;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * BOX_SIZE * 0.9;
+
+                // 產生高斯分佈速度
+                const u1 = Math.random();
+                const u2 = Math.random();
+                const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                const u3 = Math.random();
+                const u4 = Math.random();
+                const z1 = Math.sqrt(-2.0 * Math.log(u3)) * Math.cos(2.0 * Math.PI * u4);
+                const u5 = Math.random();
+                const u6 = Math.random();
+                const z2 = Math.sqrt(-2.0 * Math.log(u5)) * Math.cos(2.0 * Math.PI * u6);
+
+                // 標準化並縮放到大約初始速度
+                velocities[i * 3] = z0 * (initial_v_rms / 1.732); 
+                velocities[i * 3 + 1] = z1 * (initial_v_rms / 1.732);
+                velocities[i * 3 + 2] = z2 * (initial_v_rms / 1.732);
+            }
+        }
+
+        const gridSize = Math.ceil(BOX_SIZE / (PARTICLE_RADIUS * 2.2)); 
+        const cellSize = BOX_SIZE / gridSize;
+        const grid = new Array(gridSize * gridSize * gridSize).fill(null).map(() => []);
+
+        function getGridIndex(x, y, z) {
+            const ix = Math.floor((x + HALF_BOX) / cellSize);
+            const iy = Math.floor((y + HALF_BOX) / cellSize);
+            const iz = Math.floor((z + HALF_BOX) / cellSize);
+            const cx = Math.max(0, Math.min(gridSize - 1, ix));
+            const cy = Math.max(0, Math.min(gridSize - 1, iy));
+            const cz = Math.max(0, Math.min(gridSize - 1, iz));
+            return cx + cy * gridSize + cz * gridSize * gridSize;
+        }
+
+        function resolveCollision(i, j) {
+            const idx1 = i * 3;
+            const idx2 = j * 3;
+
+            const dx = positions[idx1] - positions[idx2];
+            const dy = positions[idx1+1] - positions[idx2+1];
+            const dz = positions[idx1+2] - positions[idx2+2];
+            const distSq = dx*dx + dy*dy + dz*dz;
+            const minDist = PARTICLE_RADIUS * 2;
+
+            if (distSq < minDist * minDist && distSq > 0) {
+                const dist = Math.sqrt(distSq);
+                
+                const overlap = (minDist - dist) * 0.5;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const nz = dz / dist;
+
+                positions[idx1] += nx * overlap;
+                positions[idx1+1] += ny * overlap;
+                positions[idx1+2] += nz * overlap;
+                positions[idx2] -= nx * overlap;
+                positions[idx2+1] -= ny * overlap;
+                positions[idx2+2] -= nz * overlap;
+
+                const vx = velocities[idx1] - velocities[idx2];
+                const vy = velocities[idx1+1] - velocities[idx2+1];
+                const vz = velocities[idx1+2] - velocities[idx2+2];
+
+                const dot = vx*nx + vy*ny + vz*nz;
+
+                if (dot > 0) return;
+
+                velocities[idx1] -= dot * nx;
+                velocities[idx1+1] -= dot * ny;
+                velocities[idx1+2] -= dot * nz;
+                velocities[idx2] += dot * nx;
+                velocities[idx2+1] += dot * ny;
+                velocities[idx2+2] += dot * nz;
+
+                collidingIndices.add(i);
+                collidingIndices.add(j);
+            }
+        }
+
+        function updatePhysics() {
+            collidingIndices.clear();
+            for(let i=0; i<grid.length; i++) grid[i].length = 0;
+
+            let currentTotalKE = 0; 
+            
+            // 時間縮放因子
+            const dt = 0.0008; 
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const idx = i * 3;
+                
+                // 位置更新
+                positions[idx] += velocities[idx] * dt; 
+                positions[idx+1] += velocities[idx+1] * dt;
+                positions[idx+2] += velocities[idx+2] * dt;
+
+                if (Math.abs(positions[idx]) > HALF_BOX - PARTICLE_RADIUS) {
+                    positions[idx] = Math.sign(positions[idx]) * (HALF_BOX - PARTICLE_RADIUS);
+                    velocities[idx] *= -1;
+                }
+                if (Math.abs(positions[idx+1]) > HALF_BOX - PARTICLE_RADIUS) {
+                    positions[idx+1] = Math.sign(positions[idx+1]) * (HALF_BOX - PARTICLE_RADIUS);
+                    velocities[idx+1] *= -1;
+                }
+                if (Math.abs(positions[idx+2]) > HALF_BOX - PARTICLE_RADIUS) {
+                    positions[idx+2] = Math.sign(positions[idx+2]) * (HALF_BOX - PARTICLE_RADIUS);
+                    velocities[idx+2] *= -1;
+                }
+
+                const vSq = velocities[idx]**2 + velocities[idx+1]**2 + velocities[idx+2]**2;
+                currentTotalKE += vSq;
+                speeds[i] = Math.sqrt(vSq);
+
+                const gridIdx = getGridIndex(positions[idx], positions[idx+1], positions[idx+2]);
+                grid[gridIdx].push(i);
+            }
+
+            for (let g = 0; g < grid.length; g++) {
+                const cell = grid[g];
+                if (cell.length < 2) continue;
+                for (let i = 0; i < cell.length; i++) {
+                    for (let j = i + 1; j < cell.length; j++) {
+                        resolveCollision(cell[i], cell[j]);
+                    }
+                }
+            }
+
+            // 恆溫器 (Thermostat)
+            const targetAvgVSq = (3 * R_GAS * targetTemp) / molarMass;
+            const currentAvgVSq = currentTotalKE / PARTICLE_COUNT; 
+            
+            if (currentAvgVSq > 0) {
+                const scale = Math.sqrt(targetAvgVSq / currentAvgVSq);
+                const rate = 0.05; 
+                const finalScale = 1 + (scale - 1) * rate;
+
+                for(let i=0; i<PARTICLE_COUNT*3; i++) {
+                    velocities[i] *= finalScale;
+                }
+            }
+            
+            // 計算結果 - 真實方均根速率
+            const v_rms = Math.sqrt(currentTotalKE / PARTICLE_COUNT);
+            
+            // 氣壓計算 (Pressure Calculation)
+            // K = 101325 / 7430400 = 0.013636 (校準係數)
+            const pressure = 0.013636 * molarMass * currentTotalKE;
+
+            return { v_rms: v_rms, pressure: pressure };
+        }
+
+        function updateChart() {
+            const bins = new Array(speedChart.data.labels.length).fill(0);
+            const maxVal = parseFloat(speedChart.data.labels[speedChart.data.labels.length-1]);
+            const binSize = maxVal / bins.length;
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                let binIndex = Math.floor(speeds[i] / binSize);
+                if (binIndex >= bins.length) binIndex = bins.length - 1;
+                bins[binIndex]++;
+            }
+
+            const smoothBins = [...bins];
+            for(let i=1; i<bins.length-1; i++) {
+                smoothBins[i] = (bins[i-1] + bins[i] + bins[i+1]) / 3;
+            }
+
+            speedChart.data.datasets[0].data = smoothBins;
+            speedChart.update();
+        }
+
+        // --- 主循環 ---
+        initPhysics();
+        updateLang();
+
+        let frameCount = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const results = updatePhysics();
+
+            // 更新顯示
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                dummy.position.set(positions[i*3], positions[i*3+1], positions[i*3+2]);
+                dummy.updateMatrix();
+                
+                if (collidingIndices.has(i)) {
+                    color.setHex(0xffffff); 
+                } else {
+                    const v = speeds[i];
+                    const t = Math.min(1, v / 1500); 
+                    color.setHSL(0.6 - t * 0.6, 1.0, 0.5); 
+                }
+                
+                particlesMesh.setColorAt(i, color);
+                particlesMesh.setMatrixAt(i, dummy.matrix);
+            }
+            particlesMesh.instanceMatrix.needsUpdate = true;
+            if (particlesMesh.instanceColor) particlesMesh.instanceColor.needsUpdate = true;
+
+            controls.update();
+            renderer.render(scene, camera);
+
+            if (frameCount % 5 === 0) {
+                updateChart();
+                document.getElementById('avgSpeedDisplay').textContent = results.v_rms.toFixed(0);
+                document.getElementById('pressureDisplay').textContent = Math.round(results.pressure).toLocaleString();
+            }
+            frameCount++;
+        }
+        animate();
+
+        // --- 互動事件 ---
+        
+        const tempSlider = document.getElementById('tempSlider');
+        const tempValue = document.getElementById('tempValue');
+        tempSlider.addEventListener('input', (e) => {
+            targetTemp = parseInt(e.target.value);
+            tempValue.textContent = targetTemp + " K";
+        });
+
+        const massSlider = document.getElementById('massSlider');
+        const massValue = document.getElementById('massValue');
+        massSlider.addEventListener('input', (e) => {
+            molarMass = parseFloat(e.target.value);
+            massValue.textContent = molarMass.toFixed(4); // Removed unit string here
+        });
+
+        document.getElementById('langBtn').addEventListener('click', () => {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            updateLang();
+        });
+
+        const modal = document.getElementById('modalOverlay');
+        const theoryBtn = document.getElementById('theoryBtn');
+        const closeModal = document.getElementById('closeModal');
+
+        function toggleModal(show) {
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.remove('modal-exit');
+                modal.classList.remove('modal-exit-active');
+                modal.classList.add('modal-enter');
+                setTimeout(() => {
+                    modal.classList.remove('modal-enter');
+                    modal.classList.add('modal-enter-active');
+                }, 10);
+            } else {
+                modal.classList.remove('modal-enter-active');
+                modal.classList.add('modal-exit');
+                setTimeout(() => modal.classList.add('modal-exit-active'), 10);
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('modal-exit');
+                    modal.classList.remove('modal-exit-active');
+                }, 200);
+            }
+        }
+
+        theoryBtn.addEventListener('click', () => {
+            toggleModal(true);
+        });
+        closeModal.addEventListener('click', () => toggleModal(false));
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) toggleModal(false);
+        });
+
+        window.addEventListener('resize', () => {
+            if(container) {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+        });
+
+    </script>
+</body>
+</html>

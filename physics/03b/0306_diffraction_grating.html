@@ -10,6 +10,8 @@
     <!-- MathJax -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Custom slider styling */
         input[type=range] {
@@ -58,7 +60,7 @@
             <!-- Top Right Buttons -->
             <div class="flex gap-2">
                 <button id="theory-btn" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-semibold shadow-lg transition-colors flex items-center gap-2">
-                    <i class="fas fa-book-open"></i> <span id="txt-theory-btn">原理</span>
+                    <i class="fas fa-book-open"></i> <span id="txt-theory-btn">原理解說</span>
                 </button>
                 <button id="lang-btn" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded text-sm font-mono text-gray-300 transition-colors">
                     中 / EN
@@ -70,95 +72,69 @@
     <!-- Main Content -->
     <main class="flex-grow p-4 md:p-8 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <!-- Controls Section -->
-        <div class="lg:col-span-1 space-y-6 bg-gray-800 p-6 rounded-xl shadow-xl h-fit">
-            <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-3 mb-4" id="txt-params">實驗參數設定</h2>
-
-            <!-- Light Source Control (Redesigned) -->
-            <div class="flex items-center justify-between pb-4 border-b border-gray-700">
-                <span class="text-sm font-medium text-gray-300" id="txt-source">光源類型</span>
-                
-                <!-- New Segmented Control Switch -->
-                <div class="relative w-40 h-8 bg-gray-700 rounded-lg p-1 flex select-none cursor-pointer" id="switch-container">
-                    <!-- Sliding Pill Background -->
-                    <div id="switch-pill" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-blue-600 rounded-md shadow-sm switch-pill z-0 translate-x-full"></div>
-                    
-                    <!-- Buttons -->
-                    <div id="btn-white" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-gray-400 transition-colors">
-                        <span id="label-white">白光</span>
-                    </div>
-                    <div id="btn-mono" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-white transition-colors">
-                        <span id="label-monochrome">單色光</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Wavelength Control (Disabled for White Light) -->
-            <div id="wavelength-control" class="space-y-2 transition-opacity duration-300">
-                <div class="flex justify-between items-center">
-                    <label class="text-sm font-medium text-gray-300"><span id="txt-wavelength">激光波長</span> (\(\lambda\))</label>
-                    <span id="lambda-display" class="font-mono font-bold text-blue-400 bg-gray-900 px-2 py-1 rounded">532 nm</span>
-                </div>
-                <input type="range" id="lambda-slider" min="380" max="750" value="532" step="1" 
-                    class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-color transition-all">
-                
-                <!-- Color Spectrum Bar -->
-                <div class="w-full h-3 rounded bg-gradient-to-r from-purple-600 via-blue-500 via-green-500 via-yellow-400 via-orange-500 to-red-600 opacity-80"></div>
-            </div>
-
-            <!-- Grating Density Control -->
-            <div class="space-y-2 pt-4 border-t border-gray-700">
-                <div class="flex justify-between items-center">
-                    <label class="text-sm font-medium text-gray-300"><span id="txt-density">光柵線密度</span> (\(N\))</label>
-                    <span id="lines-display" class="font-mono font-bold text-gray-100 bg-gray-900 px-2 py-1 rounded">500 lines/mm</span>
-                </div>
-                <!-- Updated Slider Class for Visibility -->
-                <input type="range" id="lines-slider" min="100" max="1200" value="500" step="50" 
-                    class="w-full h-2 bg-gray-600 border border-gray-500 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white">
-                
-                <!-- Calculation Display -->
-                <div class="mt-2 text-xs text-gray-400 bg-gray-900/40 p-2 rounded border border-gray-700/50">
-                    <div class="flex justify-between items-center mb-1">
-                        <span id="txt-calc-method" class="text-gray-500">計算方法:</span>
-                        <span class="font-mono text-gray-300">\( d = \frac{1}{N} \text{ mm} \)</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span><span id="txt-spacing">光柵間距</span> \(d\):</span>
-                        <span class="font-mono text-yellow-400"><span id="d-value">2.00</span> \(\mu m\)</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Visualization & Data Section -->
-        <div class="lg:col-span-2 flex flex-col gap-6">
+        <!-- Left Column: Controls & Data Table -->
+        <div class="lg:col-span-1 flex flex-col gap-6">
             
-            <!-- Visual Simulation -->
-            <div class="bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-700 relative">
-                <div class="absolute top-3 left-3 z-10 bg-gray-900/80 px-3 py-1 rounded text-xs text-gray-300 border border-gray-600">
-                    <span id="txt-screen-view">模擬屏幕視角</span>
+            <!-- Controls Section -->
+            <div class="space-y-6 bg-gray-800 p-6 rounded-xl shadow-xl h-fit">
+                <h2 class="text-lg font-semibold border-l-4 border-blue-500 pl-3 mb-4" id="txt-params">實驗參數設定</h2>
+
+                <!-- Light Source Control -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-700">
+                    <span class="text-sm font-medium text-gray-300" id="txt-source">光源類型</span>
+                    <div class="relative w-40 h-8 bg-gray-700 rounded-lg p-1 flex select-none cursor-pointer" id="switch-container">
+                        <div id="switch-pill" class="absolute top-1 left-1 bottom-1 w-[calc(50%-4px)] bg-blue-600 rounded-md shadow-sm switch-pill z-0 translate-x-full"></div>
+                        <div id="btn-white" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-gray-400 transition-colors">
+                            <span id="label-white">白光</span>
+                        </div>
+                        <div id="btn-mono" class="flex-1 z-10 text-xs font-bold flex items-center justify-center text-white transition-colors">
+                            <span id="label-monochrome">單色光</span>
+                        </div>
+                    </div>
                 </div>
-                <canvas id="diffraction-canvas" class="w-full h-64 screen-glow"></canvas>
-                <!-- Screen Ruler (Visual Aid) -->
-                <div class="absolute bottom-0 w-full flex justify-between px-4 text-[10px] text-gray-500 pb-1 select-none font-mono">
-                    <span>-90°</span>
-                    <span>-45°</span>
-                    <span id="txt-center-spot">0° (中央亮紋)</span>
-                    <span>+45°</span>
-                    <span>+90°</span>
+
+                <!-- Wavelength Control -->
+                <div id="wavelength-control" class="space-y-2 transition-opacity duration-300">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium text-gray-300"><span id="txt-wavelength">激光波長</span> (\(\lambda\))</label>
+                        <span id="lambda-display" class="font-mono font-bold text-blue-400 bg-gray-900 px-2 py-1 rounded">532 nm</span>
+                    </div>
+                    <input type="range" id="lambda-slider" min="380" max="750" value="532" step="1" 
+                        class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-color transition-all">
+                    <div class="w-full h-3 rounded bg-gradient-to-r from-purple-600 via-blue-500 via-green-500 via-yellow-400 via-orange-500 to-red-600 opacity-80"></div>
+                </div>
+
+                <!-- Grating Density Control -->
+                <div class="space-y-2 pt-4 border-t border-gray-700">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium text-gray-300"><span id="txt-density">光柵線密度</span> (\(N\))</label>
+                        <span id="lines-display" class="font-mono font-bold text-gray-100 bg-gray-900 px-2 py-1 rounded">500 lines/mm</span>
+                    </div>
+                    <input type="range" id="lines-slider" min="100" max="1200" value="500" step="50" 
+                        class="w-full h-2 bg-gray-600 border border-gray-500 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white">
+                    
+                    <div class="mt-2 text-xs text-gray-400 bg-gray-900/40 p-2 rounded border border-gray-700/50">
+                        <div class="flex justify-between items-center mb-1">
+                            <span id="txt-calc-method" class="text-gray-500">計算方法:</span>
+                            <span class="font-mono text-gray-300">\( d = \frac{1}{N} \text{ mm} \)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span><span id="txt-spacing">光柵間距</span> \(d\):</span>
+                            <span class="font-mono text-yellow-400"><span id="d-value">2.00</span> \(\mu m\)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Data Table -->
-            <div class="bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex-grow">
+            <!-- Data Table Section -->
+            <div class="bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col flex-grow">
                 <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center">
                     <h3 class="font-semibold text-gray-200"><i class="fas fa-table mr-2"></i><span id="txt-data">測量數據</span></h3>
                     <span id="max-order-container" class="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded transition-opacity"><span id="txt-max-order">最大級數</span> (\(n_{max}\)): <span id="max-order"></span></span>
                 </div>
-                <div class="overflow-x-auto relative">
+                <div class="overflow-x-auto relative flex-grow">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-gray-400 bg-gray-900/50">
-                            <!-- Headers will be injected by JS -->
                             <tr id="table-headers">
                                 <th class="px-6 py-3">級數 (\(n\))</th>
                                 <th class="px-6 py-3">計算公式 (\(\sin \theta\))</th>
@@ -174,30 +150,67 @@
                     注意：部分高階級數因 \(\sin \theta > 1\) 而無法形成。
                 </div>
             </div>
+
+        </div>
+
+        <!-- Right Column: Visualization & Graph -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            
+            <!-- Visual Simulation -->
+            <div class="bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-700 relative">
+                <div class="absolute top-3 left-3 z-10 bg-gray-900/80 px-3 py-1 rounded text-xs text-gray-300 border border-gray-600">
+                    <span id="txt-screen-view">模擬屏幕視角</span>
+                </div>
+                <canvas id="diffraction-canvas" class="w-full h-64 screen-glow"></canvas>
+                <div class="absolute bottom-0 w-full flex justify-between px-4 text-[10px] text-gray-500 pb-1 select-none font-mono">
+                    <span>-90°</span>
+                    <span>-45°</span>
+                    <span id="txt-center-spot">0° (中央亮紋)</span>
+                    <span>+45°</span>
+                    <span>+90°</span>
+                </div>
+            </div>
+
+            <!-- Graph Section -->
+            <div class="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-300 flex flex-col relative">
+                <div class="p-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="font-semibold text-gray-800"><i class="fas fa-chart-line mr-2"></i><span id="txt-graph-title">關係線圖</span></h3>
+                </div>
+                
+                <div class="p-4 flex-grow flex flex-col justify-center bg-white relative">
+                     <!-- Graph Overlay for White Light -->
+                     <div id="graph-overlay" class="absolute inset-0 bg-white/90 z-10 flex items-center justify-center text-center p-4 hidden">
+                        <p class="text-gray-600 text-sm"><i class="fas fa-ban mr-2"></i><span id="txt-graph-na">此圖表僅適用於單色光</span></p>
+                    </div>
+
+                    <div class="text-xs text-gray-700 mb-2 flex flex-col gap-1">
+                        <div class="flex justify-between">
+                            <span id="txt-slope-label" class="font-bold">直線斜率 (Slope):</span>
+                            <span id="slope-value" class="font-mono font-bold text-green-600">0.000</span>
+                        </div>
+                        <div class="text-[10px] text-gray-600">
+                            <span id="txt-slope-meaning">意義: \(\lambda / d\) (波長與光柵間距之比)</span>
+                        </div>
+                    </div>
+                    <div class="relative h-64 w-full"> 
+                        <canvas id="slope-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
-    <!-- Modal Structure -->
+    <!-- Modal Structure (No Changes) -->
     <div id="theory-modal" class="modal fixed w-full h-full top-0 left-0 flex items-center justify-center opacity-0 pointer-events-none z-50">
         <div class="modal-overlay absolute w-full h-full bg-black opacity-50"></div>
-        
         <div class="modal-container bg-gray-800 w-11/12 md:max-w-xl mx-auto rounded shadow-lg z-50 overflow-y-auto transform scale-95 transition-transform duration-300 border border-gray-600 max-h-[90vh]">
-            
             <div class="modal-content py-4 text-left px-6">
-                <!-- Title -->
                 <div class="flex justify-between items-center pb-3 border-b border-gray-600">
                     <p class="text-xl font-bold text-blue-400" id="txt-modal-title">原理提示</p>
-                    <div class="modal-close cursor-pointer z-50 text-gray-300 hover:text-white">
-                        <i class="fas fa-times"></i>
-                    </div>
+                    <div class="modal-close cursor-pointer z-50 text-gray-300 hover:text-white"><i class="fas fa-times"></i></div>
                 </div>
-
-                <!-- Body -->
-                <div class="my-5 text-gray-300 text-sm leading-relaxed" id="txt-modal-body">
-                    <!-- Content will be injected by JS -->
-                </div>
-
-                <!-- Footer -->
+                <div class="my-5 text-gray-300 text-sm leading-relaxed" id="txt-modal-body"></div>
                 <div class="flex justify-end pt-2">
                     <button class="modal-close px-4 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-colors text-sm font-bold">OK</button>
                 </div>
@@ -224,6 +237,10 @@
                 centerSpot: "0° (中央亮紋)",
                 data: "測量數據",
                 maxOrder: "最大級數",
+                graphTitle: "關係線圖 (sin θ vs n)",
+                slopeLabel: "直線斜率 (Slope):",
+                slopeMeaning: "意義: \\(\\lambda / d\\) (波長與光柵間距之比)",
+                graphNA: "此圖表僅適用於單色光",
                 thOrder: "級數 (\\(n\\))",
                 thFormula: "計算公式 (\\(\\sin \\theta\\))",
                 thAngle: "繞射角 (\\(\\theta\\))",
@@ -274,6 +291,10 @@
                 centerSpot: "0° (Central Max)",
                 data: "Measurement Data",
                 maxOrder: "Max Order",
+                graphTitle: "Relationship (sin θ vs n)",
+                slopeLabel: "Slope:",
+                slopeMeaning: "Meaning: \\(\\lambda / d\\) (Ratio of Wavelength to Spacing)",
+                graphNA: "Chart available for monochromatic light only",
                 thOrder: "Order (\\(n\\))",
                 thFormula: "Formula (\\(\\sin \\theta\\))",
                 thAngle: "Angle (\\(\\theta\\))",
@@ -322,6 +343,11 @@
         const canvas = document.getElementById('diffraction-canvas');
         const ctx = canvas.getContext('2d');
         
+        // Chart Elements
+        const slopeValueDisplay = document.getElementById('slope-value');
+        const graphOverlay = document.getElementById('graph-overlay');
+        let slopeChart = null;
+
         // Switch Elements
         const switchContainer = document.getElementById('switch-container');
         const switchPill = document.getElementById('switch-pill');
@@ -356,7 +382,11 @@
             'txt-data': 'data',
             'txt-max-order': 'maxOrder',
             'txt-modal-title': 'modalTitle',
-            'txt-modal-body': 'modalBody'
+            'txt-modal-body': 'modalBody',
+            'txt-graph-title': 'graphTitle',
+            'txt-slope-label': 'slopeLabel',
+            'txt-slope-meaning': 'slopeMeaning',
+            'txt-graph-na': 'graphNA'
         };
 
         // --- State ---
@@ -408,9 +438,123 @@
             const lambda_m = lambda * 1e-9; // meters
 
             // Max Order: n * lambda = d * sin(theta) <= d  => n <= d / lambda
-            const maxOrder = Math.floor(d_m / lambda_m);
+            // FIX: Add a small epsilon to avoid floating point issues where d/lambda is exactly integer but represented slightly smaller
+            const maxOrder = Math.floor((d_m / lambda_m) + 1e-10);
+            
+            // Slope m = lambda / d
+            const slope = lambda_m / d_m;
 
-            return { d_microns, d_m, lambda_m, maxOrder };
+            return { d_microns, d_m, lambda_m, maxOrder, slope };
+        }
+        
+        // --- Chart Initialization ---
+        function initChart() {
+            const ctxChart = document.getElementById('slope-chart').getContext('2d');
+            
+            // Define plugin to draw arrows
+            const arrowPlugin = {
+                id: 'arrowPlugin',
+                afterDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    const xAxis = chart.scales.x;
+                    const yAxis = chart.scales.y;
+                    
+                    // Style settings for arrows
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = '#000000';
+                    ctx.fillStyle = '#000000';
+
+                    // Draw Y-axis Arrow (Top)
+                    const yTop = yAxis.top;
+                    const xLeft = yAxis.right; // Axis line position
+
+                    // Triangle for Y axis
+                    ctx.moveTo(xLeft, yTop - 5);
+                    ctx.lineTo(xLeft - 4, yTop + 5);
+                    ctx.lineTo(xLeft + 4, yTop + 5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Draw X-axis Arrow (Right)
+                    const xRight = xAxis.right;
+                    const yAxisLine = xAxis.top; // Axis line position (0 line usually)
+
+                    // Triangle for X axis
+                    ctx.moveTo(xRight + 5, yAxisLine);
+                    ctx.lineTo(xRight - 5, yAxisLine - 4);
+                    ctx.lineTo(xRight - 5, yAxisLine + 4);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            };
+
+            slopeChart = new Chart(ctxChart, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'sin θ vs n',
+                        borderColor: '#16a34a', // darker green for white bg
+                        backgroundColor: '#16a34a',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        showLine: true,
+                        data: [] // Will be populated
+                    }]
+                },
+                plugins: [arrowPlugin],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            top: 10,
+                            right: 20 // Add padding for arrows
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Order (n)', color: '#000000', font: { weight: 'bold' } },
+                            ticks: { color: '#000000', stepSize: 1 },
+                            grid: { color: '#e5e7eb', borderColor: '#000000' }, // borderColor adds the axis line in black
+                            border: { color: '#000000' }
+                        },
+                        y: {
+                            title: { display: true, text: 'sin θ', color: '#000000', font: { weight: 'bold' } },
+                            min: 0,
+                            max: 1.0, 
+                            ticks: { color: '#000000' },
+                            grid: { color: '#e5e7eb', borderColor: '#000000' },
+                            border: { color: '#000000' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(calc) {
+            if (!slopeChart) return;
+            
+            const points = [];
+            
+            for(let n=0; n <= calc.maxOrder + 1; n++) { 
+                const sinTheta = n * calc.slope;
+                if (sinTheta <= 1) {
+                    points.push({ x: n, y: sinTheta });
+                }
+            }
+            
+            slopeChart.data.datasets[0].data = points;
+            slopeChart.update();
+            
+            slopeValueDisplay.textContent = calc.slope.toFixed(4);
         }
 
         // --- UI Updates ---
@@ -446,6 +590,9 @@
                 warningMsg.style.opacity = '1';
                 maxOrderContainer.style.opacity = '0';
                 
+                // Show Graph Overlay
+                graphOverlay.classList.remove('hidden');
+                
                 // Set White Light Headers
                 tableHeaders.innerHTML = `
                     <th class="px-6 py-3">${txt.thOrder}</th>
@@ -470,6 +617,9 @@
                 tableBody.style.opacity = '1';
                 warningMsg.style.opacity = '1';
                 maxOrderContainer.style.opacity = '1';
+                
+                // Hide Graph Overlay
+                graphOverlay.classList.add('hidden');
 
                 // Set Monochrome Headers
                 tableHeaders.innerHTML = `
@@ -502,6 +652,7 @@
 
                 updateTable(calc);
                 drawMonochromeSimulation(calc, color);
+                updateChart(calc);
             }
             
             // Rerender MathJax
@@ -530,25 +681,28 @@
             const row0 = `
                 <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors">
                     <td class="px-6 py-4 font-medium text-white">${txt.central0}</td>
-                    <td class="px-6 py-4 font-mono text-gray-400">0.000</td>
-                    <td class="px-6 py-4 text-right font-bold text-blue-300">0.0°</td>
+                    <td class="px-6 py-4 font-mono text-gray-400">0.0000</td>
+                    <td class="px-6 py-4 text-right font-bold text-blue-300">0.00°</td>
                 </tr>
             `;
             tableBody.insertAdjacentHTML('beforeend', row0);
 
             for (let n = 1; n <= calc.maxOrder; n++) {
                 const sinTheta = (n * calc.lambda_m) / calc.d_m;
-                const thetaRad = Math.asin(sinTheta);
-                const thetaDeg = (thetaRad * 180 / Math.PI).toFixed(1);
+                // FIX: Clamp value to 1 to avoid NaN from floating point error at 90 deg
+                const clampedSin = Math.min(1.0, sinTheta);
+                const thetaRad = Math.asin(clampedSin);
+                // Increased precision to 2 decimal places for better verification
+                const thetaDeg = (thetaRad * 180 / Math.PI).toFixed(2);
                 
                 const row = `
                     <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors border-t border-gray-700">
                         <td class="px-6 py-4 font-medium text-white">±${n}</td>
-                        <td class="px-6 py-4 font-mono text-gray-400">${sinTheta.toFixed(3)}</td>
+                        <td class="px-6 py-4 font-mono text-gray-400">${clampedSin.toFixed(4)}</td> <!-- Increased precision to 4 decimal places -->
                         <td class="px-6 py-4 text-right font-bold text-blue-300">${thetaDeg}°</td>
                     </tr>
                 `;
-                tableBody.insertAdjacentHTML('beforeend', row0);
+                tableBody.insertAdjacentHTML('beforeend', row);
             }
              warningMsg.classList.toggle('hidden', calc.maxOrder >= 4); 
         }
@@ -561,8 +715,8 @@
             const row0 = `
                 <tr class="bg-gray-800/50 hover:bg-gray-800 transition-colors">
                     <td class="px-6 py-4 font-medium text-white">${txt.central0}</td>
-                    <td class="px-6 py-4 font-mono text-gray-400">0.0°</td>
-                    <td class="px-6 py-4 text-right font-mono text-gray-400">0.0°</td>
+                    <td class="px-6 py-4 font-mono text-gray-400">0.00°</td>
+                    <td class="px-6 py-4 text-right font-mono text-gray-400">0.00°</td>
                 </tr>
             `;
             tableBody.insertAdjacentHTML('beforeend', row0);
@@ -581,14 +735,15 @@
 
                 if (sinV > 1) break;
 
-                const thetaV = (Math.asin(sinV) * 180 / Math.PI).toFixed(1) + '°';
+                // FIX: Clamp values & Increase precision
+                const thetaV = (Math.asin(Math.min(1.0, sinV)) * 180 / Math.PI).toFixed(2) + '°';
                 let thetaR = '';
                 
                 if (sinR > 1) {
                     thetaR = `<span class="text-gray-500 italic text-xs">${txt.notFormed}</span>`;
                     showWarning = true;
                 } else {
-                    thetaR = (Math.asin(sinR) * 180 / Math.PI).toFixed(1) + '°';
+                    thetaR = (Math.asin(Math.min(1.0, sinR)) * 180 / Math.PI).toFixed(2) + '°';
                 }
 
                 const row = `
@@ -629,7 +784,11 @@
             // Draw Orders
             for (let n = 1; n <= calc.maxOrder; n++) {
                 const sinTheta = (n * calc.lambda_m) / calc.d_m;
-                const thetaDeg = Math.asin(sinTheta) * 180 / Math.PI;
+                
+                // FIX: Clamp for drawing too
+                const clampedSin = Math.min(1.0, sinTheta);
+                const thetaDeg = Math.asin(clampedSin) * 180 / Math.PI;
+                
                 const offsetPixels = thetaDeg * m.pixelsPerDegree;
                 const intensity = 1 / (n * 0.8 + 1); 
 
@@ -780,6 +939,7 @@
         window.addEventListener('resize', updateUI);
         
         window.addEventListener('load', () => {
+             initChart();
              updateUI();
         });
 
